@@ -171,6 +171,16 @@ Grok Build ended before it called its X search tools, and returned empty items p
 
 Retry the search. If it keeps happening, update Grok Build (`grok` CLI).
 
+## modsearch refused to run (recursion guard)
+
+```
+modsearch refused to run: it was started from inside an engine that modsearch itself spawned (recursion guard). An engine such as Grok Build tried to call modsearch instead of using its own search tools.
+```
+
+modsearch started an engine, and that engine tried to launch modsearch again. The CLI stops this loop rather than spend another round of quota.
+
+This is not a config problem. grok-cli already denies the tools that would shell out. Retry the search. If it keeps happening, update Grok Build (`grok` CLI).
+
 ## Everything failed
 
 ```

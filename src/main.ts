@@ -18,6 +18,13 @@ import { findEngine, listEngines } from './providers/index.ts';
 import { runSearch } from './search.ts';
 import { readSecret } from './util/secretInput.ts';
 
+if (process.env.MODSEARCH_NESTED) {
+  process.stderr.write(
+    'modsearch refused to run: it was started from inside an engine that modsearch itself spawned (recursion guard). An engine such as Grok Build tried to call modsearch instead of using its own search tools.\n',
+  );
+  process.exit(1);
+}
+
 const program = new Command();
 
 program

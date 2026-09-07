@@ -66,3 +66,28 @@ describe.runIf(SPAWNS_FAKE_CLI)('runCommand timeout handling', () => {
     expect(await waitFor(() => processGone(pid), 20_000)).toBe(true);
   }, 45_000);
 });
+
+describe.runIf(SPAWNS_FAKE_CLI)('runCommand child environment', () => {
+  it('sets MODSEARCH_NESTED=1 on the child and keeps inherited env', async () => {
+    const dir = tempDir('modsearch-nested-env-');
+    const bin = path.join(dir, 'echo-env');
+    fs.writeFileSync(
+      bin,
+      '#!/bin/sh\nprintf "NESTED=%s\\nSENTINEL=%s\\n" "$MODSEARCH_NESTED" "$MODSEARCH_TEST_SENTINEL"\n',
+      { mode: 0o755 },
+    );
+    const previous = process.env.MODSEARCH_TEST_SENTINEL;
+    process.env.MODSEARCH_TEST_SENTINEL = 'keep-me';
+    try {
+      const result = await runCommand('echo-env', { command: bin, args: [], cwd: dir }, 5_000);
+      expect(result.stdout).toContain('NESTED=1');
+      expect(result.stdout).toContain('SENTINEL=keep-me');
+    } finally {
+      if (previous === undefined) {
+        delete process.env.MODSEARCH_TEST_SENTINEL;
+      } else {
+        process.env.MODSEARCH_TEST_SENTINEL = previous;
+      }
+    }
+  });
+});

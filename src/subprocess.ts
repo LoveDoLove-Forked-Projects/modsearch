@@ -36,6 +36,10 @@ export function runCommand(
     const child = spawnHidden(invocation.command, invocation.args, {
       cwd: invocation.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Mark engine children so a nested `modsearch` refuses to start.
+      // spawnHidden is shared with the dsh plugin, which launches dist/main.js
+      // as a normal parent and must not set this.
+      env: { ...process.env, MODSEARCH_NESTED: '1' },
     });
 
     // Decoders keep state across chunks: a multi-byte character split down the

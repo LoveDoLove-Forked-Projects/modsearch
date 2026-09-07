@@ -171,6 +171,16 @@ Grok Build 在调用 X 搜索工具之前就结束了，返回空的 items，再
 
 再跑一次搜索。如果反复出现，更新 Grok Build（`grok` CLI）。
 
+## modsearch 拒绝运行（递归守卫）
+
+```
+modsearch refused to run: it was started from inside an engine that modsearch itself spawned (recursion guard). An engine such as Grok Build tried to call modsearch instead of using its own search tools.
+```
+
+modsearch 拉起了一个引擎，那个引擎又想再跑一次 modsearch。CLI 会拦住这个循环，避免再花一轮额度。
+
+这不是配置问题。grok-cli 已经禁止了会向外调 shell 的工具。再跑一次搜索。如果反复出现，更新 Grok Build（`grok` CLI）。
+
 ## 全军覆没
 
 ```
