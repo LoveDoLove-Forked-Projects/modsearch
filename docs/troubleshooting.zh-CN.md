@@ -161,6 +161,16 @@ antigravity-cli engine timed out after 210000 ms.
 
 先用 `--timeout 300000` 重试一次。还超时的话，引擎是卡住了不是慢：手动开 `agy` 检查。无视 SIGTERM 的引擎会被升级到 SIGKILL，所以就算进程不配合，超时也总能及时返回。
 
+## Grok Build 在搜索 X 之前就停了
+
+```
+Grok Build stopped before searching X (placeholder result). Retry, or update Grok Build.
+```
+
+Grok Build 在调用 X 搜索工具之前就结束了，返回空的 items，再配上「正在检索…」这类占位说法。旧版 modsearch 会给 grok 传 `--json-schema`，这个参数会截断 Grok Build 的搜索循环，所以每次都是占位结果。当前版本不再传这个参数，结果从最终消息里读取。
+
+再跑一次搜索。如果反复出现，更新 Grok Build（`grok` CLI）。
+
 ## 全军覆没
 
 ```

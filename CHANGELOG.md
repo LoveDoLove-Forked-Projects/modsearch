@@ -6,6 +6,8 @@
 
 - Local fetch now works in proxy fake-IP mode (Clash, Clash Verge Rev, mihomo, Surge) without `allowPrivateNetwork`. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders and the connection stays pinned to the checked address. Literal URLs such as `http://198.18.0.5/` remain blocked when the switch is off (#26).
 
+- grok-cli returned a placeholder ("Uncertain: 检索尚未完成") because `--json-schema` cut Grok Build's search loop. It now runs without that flag and reads the result from the final message (#27).
+- grok-cli now passes `--disallowed-tools` so Grok Build cannot read the user's skills and shell out to modsearch, which would recurse. `--tools` (allowlist) does not cover injected x_* tools, so the denylist is the one that works. web_search and web_fetch stay available.
 
 ## 5.10.1 - 2026-09-04
 

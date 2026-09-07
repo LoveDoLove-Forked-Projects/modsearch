@@ -8,7 +8,7 @@ Provide the `modsearch` CLI tool that turns search queries and page URLs into st
 
 - **Pluggable engines** — the engine interface (`buildInvocation` + `parseOutput` for subprocess engines, or `execute` for in-process ones) keeps each engine contained to one file, so adding or swapping one touches nothing else. Antigravity CLI (`agy`) is the preferred search engine when it is available.
 - **Two modes, one CLI**: `-q` searches the web, `-u` fetches a single page (absorbed from the retired `modfetch` project). `-u` plus `-q` fetches with an answer focus.
-- **Schema-enforced JSON output**: subprocess engines are invoked with `--json-schema`, so the structured result comes back guaranteed, no markdown scraping.
+- **Schema-enforced JSON output**: subprocess engines are invoked with `--json-schema`, so the structured result comes back guaranteed, no markdown scraping. grok-cli is the exception: that flag disables its search loop, so the result is salvaged from the final text.
 - **Selectable automatic chain**: every engine participates by default. `engines.<name>.enabled: false` excludes one from automatic search, fetch, or X routing. An explicit `--engine` still forces a one-off run. `doctor` reports readiness and enabled state separately.
 - **Hidden Windows children**: the core and standalone dsh plugin each own one child-process wrapper that forces `windowsHide: true`. A contract test rejects direct `child_process` access anywhere else in shipped code.
 - **Single responsibility**: this project handles the live web (search + fetch). Image parsing lives in `modlens`.
