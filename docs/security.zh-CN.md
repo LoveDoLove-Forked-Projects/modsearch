@@ -22,7 +22,7 @@ read_when:
 
 `local` 引擎在任何请求发出之前就拒绝：
 
-- 私有和保留的 IPv4、IPv6 地址段，包括 `::ffff:` 映射形式
+- 私有和保留的 IPv4、IPv6 地址段，包括 `::ffff:` 映射形式，DNS fake-ip 例外见下文
 - 云元数据端点（`169.254.169.254`、`metadata.google.internal` 等）
 - 带内嵌凭据的 URL，以及 http/https 之外的任何协议
 
@@ -38,9 +38,11 @@ read_when:
 
 Firecrawl 公网页面抓取是一条云端边界：公网页面的 URL 会被发给 Firecrawl 的服务，由云端浏览器读取。它默认开启（裸安装能读 JavaScript 页面靠的就是它），每次云端抓取的结果都带一条注明路径的 warning。想让自动抓取只走本地，运行 `modsearch config set firecrawl.keylessFetch false`。配置了 Firecrawl key 或显式选择 Firecrawl 引擎时仍会启用。URL 中直写的私有和保留地址目标在任何配置下都不会发往云端。DNS 解析结果按下文更窄的披露规则处理。
 
-分流隧道的 VPN 客户端常把公网主机名映射进 `198.18.0.0/15` 这类保留段，普通网站在本地守卫看来也会像私网。`--allow-private-network`（或顶层的 `modsearch config set allowPrivateNetwork true`）只对本地抓取器放行。开关打开时，本地抓取器还会信任操作系统证书库，由本地转发代理的已安装 CA 签发的证书才能通过校验。它不授权云端披露。不要用它去访问真正的内网地址。
+Clash、Clash Verge Rev、mihomo 和 Surge 的代理 fake-ip 模式开箱即用。本地守卫和 Firecrawl 的云端披露判定都把 DNS 返回的 `198.18.0.0/15` 地址视为代理 fake-ip 占位值，不需要打开 `allowPrivateNetwork`。本地 socket 仍固定连到校验过的那个 fake-ip，Host 头和 TLS SNI 保留主机名。这个例外只作用于 DNS 解析结果。URL 中直写的 `http://198.18.0.5/` 这类地址在开关关闭时仍会被拒绝，也永远不会发往 Firecrawl。
 
-Firecrawl 的云端披露判定对 DNS 结果采用更窄的规则。Clash、Surge 和 mihomo 都把 `198.18.0.0/15` 用作标准 fake-ip 池，因此这段地址在该判定中视为疑似 fake-ip 占位值。只有所有解析结果都是真私网或保留地址时，主机名才不会交给 Firecrawl。只要有一个公网地址就会放行。这个例外只作用于 DNS 解析结果。URL 中直写的 `198.18.0.0/15` 地址仍会被拒绝，本地 SSRF 守卫也继续把整个地址段判为私网，socket 固定路径仍经过原有安全检查。
+把公网主机名映射进其它保留段的分流隧道 VPN，以及把它们映射到回环地址的 hosts 文件加速器（如 Watt Toolkit / Steam++），仍需要 `--allow-private-network` 或顶层的 `modsearch config set allowPrivateNetwork true`。这个开关只对本地抓取器放行。开关打开时，本地抓取器还会信任操作系统证书库，由本地转发代理的已安装 CA 签发的证书才能通过校验。它不授权云端披露。不要用它去访问真正的内网地址。
+
+Firecrawl 只在扣除 fake-ip 例外后所有解析结果都是私网或保留地址时才扣下主机名。只要有一个公网地址或 fake-ip 地址，公网 URL 就会交给 Firecrawl。本地守卫则相反：只要还有任何一个其它私网或保留地址，即使同时有 fake-ip 或公网地址，也会拦下这个主机名。
 
 ## 不可信的页面内容
 
