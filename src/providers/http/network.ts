@@ -2,6 +2,9 @@
 // surface: an agent will happily fetch a URL that appeared inside a web page,
 // so blocked hostnames, private and reserved address ranges, and every redirect
 // hop are validated here before a request goes out.
+// DNS-derived IPv4 addresses in 198.18.0.0/15 are proxy fake-IP placeholders
+// and pass without a private-network waiver. Literal URLs in that range stay
+// blocked unless the guard is waived.
 //
 // DNS rebinding is closed: assertSafeRemoteTarget resolves the hostname, checks
 // every address, and returns the exact IP it validated. The caller pins the
@@ -129,7 +132,9 @@ export async function assertSafeRemoteTarget(
   }
 
   if (!allowPrivateNetwork) {
-    const blocked = resolved.find((record) => isPrivateIpAddress(record.address));
+    const blocked = resolved.find(
+      (record) => !isFakeIpPoolAddress(record.address) && isPrivateIpAddress(record.address),
+    );
     if (blocked) {
       throw new Error(privateNetworkBlockMessage(hostname, blocked.address));
     }
@@ -170,10 +175,11 @@ export function isLiteralReservedTarget(url: URL): boolean {
  * prove this target private or reserved and therefore unsafe to disclose?
  *
  * This is not a security boundary. The local engine's assertSafeRemoteTarget
- * stays the SSRF guard: it pins the connection and refuses on any doubt. This
- * one controls cloud disclosure. DNS-derived 198.18/15 addresses are treated as
- * standard proxy fake-IP placeholders, and any genuinely public answer allows
- * the cloud fetch. It never connects or pins. A DNS failure returns false
+ * stays the SSRF guard and pins the connection. Both paths exempt DNS-derived
+ * IPv4 198.18/15 fake-IP placeholders, while literal addresses stay reserved.
+ * The local guard blocks any other private or reserved answer. This cloud check
+ * allows disclosure if any answer is public or a fake-IP placeholder.
+ * It never connects or pins. A DNS failure returns false
  * because this process cannot prove the target is reserved. The local-only
  * private-network switch does not change this result.
  */
@@ -181,7 +187,11 @@ export async function isReservedTarget(url: URL): Promise<boolean> {
   return (await inspectCloudDisclosureTarget(url)).reserved;
 }
 
-/** Inspect a target for cloud disclosure and retain its DNS evidence for errors. */
+/**
+ * Inspect a target for cloud disclosure and retain its DNS evidence for errors.
+ * DNS answers share the local guard's IPv4 fake-IP exemption. Literal private
+ * or reserved targets, including 198.18/15 addresses, remain reserved.
+ */
 export async function inspectCloudDisclosureTarget(url: URL): Promise<CloudDisclosureInspection> {
   if (isBlockedHostname(url.hostname)) {
     return { reserved: true, addresses: [] };
@@ -207,15 +217,14 @@ export async function inspectCloudDisclosureTarget(url: URL): Promise<CloudDiscl
   }
 }
 
-/** Cloud crawlers treat the standard proxy fake-IP pool as a public DNS placeholder. */
+/** Shared DNS-only exemption for local fetch and cloud disclosure. */
+function isFakeIpPoolAddress(ipAddress: string): boolean {
+  return isIP(ipAddress) === 4 && inRange(ipv4ToNumber(ipAddress), '198.18.0.0', '198.19.255.255');
+}
+
+/** DNS fake-IP placeholders do not mark a hostname private for cloud disclosure. */
 function isPrivateForCloudDisclosure(ipAddress: string): boolean {
-  if (isIP(ipAddress) === 4) {
-    const value = ipv4ToNumber(ipAddress);
-    if (inRange(value, '198.18.0.0', '198.19.255.255')) {
-      return false;
-    }
-  }
-  return isPrivateIpAddress(ipAddress);
+  return !isFakeIpPoolAddress(ipAddress) && isPrivateIpAddress(ipAddress);
 }
 
 const ALLOW_PRIVATE_NETWORK_HINT =
@@ -225,9 +234,9 @@ function privateNetworkBlockMessage(hostname: string, resolvedAddress?: string):
   const target = resolvedAddress ? `${hostname} -> ${resolvedAddress}` : hostname;
   const blockedAddress = resolvedAddress ?? hostname;
   if (isLoopbackIpAddress(blockedAddress)) {
-    return `Blocked private network target: ${target}. If a VPN or proxy on this machine maps public hosts into reserved ranges, or a hosts-file accelerator (such as Watt Toolkit / Steam++) points public domains at 127.0.0.1, ${ALLOW_PRIVATE_NETWORK_HINT}`;
+    return `Blocked private network target: ${target}. If a VPN or proxy on this machine maps public hosts into reserved ranges outside the 198.18.0.0/15 fake-IP pool, or a hosts-file accelerator (such as Watt Toolkit / Steam++) points public domains at 127.0.0.1, ${ALLOW_PRIVATE_NETWORK_HINT}`;
   }
-  return `Blocked private network target: ${target}. If a VPN or proxy on this machine maps public hosts into reserved ranges, ${ALLOW_PRIVATE_NETWORK_HINT}`;
+  return `Blocked private network target: ${target}. If a VPN or proxy on this machine maps public hosts into reserved ranges outside the 198.18.0.0/15 fake-IP pool, ${ALLOW_PRIVATE_NETWORK_HINT}`;
 }
 
 function isLoopbackIpAddress(ipAddress: string): boolean {

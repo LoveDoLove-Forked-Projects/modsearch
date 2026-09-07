@@ -38,7 +38,7 @@ English | [简体中文](security.zh-CN.md)
 
 The `local` engine refuses, before any request goes out:
 
-- Private and reserved IPv4 and IPv6 ranges, including `::ffff:` mapped forms
+- Private and reserved IPv4 and IPv6 ranges, including `::ffff:` mapped forms, with the DNS fake-IP exception described below
 - Cloud metadata endpoints (`169.254.169.254`, `metadata.google.internal`, and friends)
 - URLs carrying embedded credentials, and any scheme other than http/https
 
@@ -54,9 +54,11 @@ The pin is IP-level, not port-level, and only the local engine is affected. The 
 
 Firecrawl public-page fetch is a cloud boundary: the URL of a public page is sent to Firecrawl's service, which reads it with a cloud browser. This is on by default (it is what makes a bare install fetch JavaScript pages), and every cloud-fetched result carries a warning naming the route. To keep automatic page fetch local-only, run `modsearch config set firecrawl.keylessFetch false`. A configured Firecrawl key or an explicit Firecrawl engine choice still enables it. Literal private and reserved targets never go to the cloud in any configuration. DNS-derived addresses follow the narrower disclosure rule below.
 
-Split-tunnel VPN clients often map public hostnames into reserved ranges such as `198.18.0.0/15`, which makes ordinary sites look private to the local guard. `--allow-private-network` (or the top-level `modsearch config set allowPrivateNetwork true`) opens those addresses for the local fetcher only. When the switch is on, the local fetcher also trusts the OS certificate store, so it can accept a certificate issued by a local forwarding proxy's installed CA. It does not authorize cloud disclosure. Do not use it to reach genuinely internal addresses.
+Proxy fake-IP mode in Clash, Clash Verge Rev, mihomo, and Surge works out of the box. Both the local guard and Firecrawl's cloud-disclosure check treat DNS answers in `198.18.0.0/15` as proxy fake-IP placeholders, so no `allowPrivateNetwork` switch is needed. The local socket stays pinned to the checked fake IP, and the Host header and TLS SNI keep the hostname. This exemption applies only to DNS answers. A literal URL such as `http://198.18.0.5/` stays blocked when `allowPrivateNetwork` is off and never goes to Firecrawl.
 
-Firecrawl's cloud-disclosure check uses a narrower rule for DNS answers. An address in `198.18.0.0/15` is treated as a likely fake-IP placeholder because Clash, Surge, and mihomo use that standard pool. A hostname is held back only when every resolved address is genuinely private or reserved. Any public address lets Firecrawl receive the public URL. This exception applies only to DNS-derived addresses. A literal `198.18.0.0/15` URL is still blocked, and the local SSRF guard continues to classify the whole range as private and pin its socket only after the normal safety check.
+Split-tunnel VPNs that map public hostnames into other reserved ranges, and hosts-file accelerators such as Watt Toolkit / Steam++ that map them to loopback, still need `--allow-private-network` or the top-level `modsearch config set allowPrivateNetwork true`. This switch opens those addresses for the local fetcher only. When it is on, the local fetcher also trusts the OS certificate store, so it can accept a certificate issued by a local forwarding proxy's installed CA. It does not authorize cloud disclosure. Do not use it to reach genuinely internal addresses.
+
+Firecrawl withholds a hostname only when every resolved address is private or reserved after the fake-IP exemption. Any public or fake-IP answer allows the public URL to be sent to Firecrawl. The local guard still blocks a hostname if any other DNS answer is private or reserved, even alongside a fake-IP or public answer.
 
 ## Untrusted page content
 

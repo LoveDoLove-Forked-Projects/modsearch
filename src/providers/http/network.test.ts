@@ -83,6 +83,66 @@ describe('assertSafeRemoteTarget returns the pinned IP', () => {
     expect(pinned.family).toBe(6);
   });
 
+  it.each(['198.18.0.0', '198.18.0.5', '198.19.0.1', '198.19.255.255'])(
+    'allows and pins DNS fake-IP answer %s without a private-network waiver',
+    async (address) => {
+      lookupMock.mockResolvedValue([{ address, family: 4 }]);
+
+      expect(await assertSafeRemoteTarget(u('https://example.com/'), false)).toEqual({
+        hostname: 'example.com',
+        address,
+        family: 4,
+      });
+    },
+  );
+
+  it('pins the first fake-IP answer when DNS also returns a public address', async () => {
+    lookupMock.mockResolvedValue([
+      { address: '198.18.0.5', family: 4 },
+      { address: '2606:4700:4700::1111', family: 6 },
+    ]);
+
+    expect(await assertSafeRemoteTarget(u('https://example.com/'), false)).toEqual({
+      hostname: 'example.com',
+      address: '198.18.0.5',
+      family: 4,
+    });
+  });
+
+  it.each(['198.18.0.5', '198.19.255.255', '[::ffff:198.18.0.5]'])(
+    'blocks literal %s without a private-network waiver',
+    async (address) => {
+      const url = u(`http://${address}/`);
+      await expect(assertSafeRemoteTarget(url, false)).rejects.toThrow(
+        `Blocked private network target: ${bare(url)}`,
+      );
+      expect(lookupMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    { address: '10.0.0.5', family: 4 },
+    { address: '100.64.0.5', family: 4 },
+    { address: '::ffff:198.18.0.5', family: 6 },
+  ])('still blocks DNS answer $address without a waiver', async ({ address, family }) => {
+    lookupMock.mockResolvedValue([{ address, family }]);
+
+    await expect(assertSafeRemoteTarget(u('https://example.com/'), false)).rejects.toThrow(
+      `Blocked private network target: example.com -> ${address}`,
+    );
+  });
+
+  it('blocks mixed fake-IP and private DNS answers before pinning', async () => {
+    lookupMock.mockResolvedValue([
+      { address: '198.18.0.5', family: 4 },
+      { address: '10.0.0.5', family: 4 },
+    ]);
+
+    await expect(assertSafeRemoteTarget(u('https://example.com/'), false)).rejects.toThrow(
+      'Blocked private network target: example.com -> 10.0.0.5',
+    );
+  });
+
   it('blocks private IPv4, IPv6, and mapped-private literals before pinning', async () => {
     await expect(assertSafeRemoteTarget(u('http://127.0.0.1/'), false)).rejects.toThrow(/private/i);
     await expect(assertSafeRemoteTarget(u('http://[::1]/'), false)).rejects.toThrow(/private/i);
@@ -173,11 +233,12 @@ describe('hostname-resolution block messages', () => {
   });
 
   it.each([
-    { address: '198.18.91.58', family: 4 },
+    { address: '100.64.0.5', family: 4 },
     { address: '10.0.0.5', family: 4 },
   ])('keeps VPN wording for reserved non-loopback $address', async ({ address, family }) => {
     const message = await blockedMessage(address, family);
     expect(message).toMatch(/VPN or proxy/);
+    expect(message).toContain('reserved ranges outside the 198.18.0.0/15 fake-IP pool');
     expect(message).toContain(allowHint);
     expect(message).not.toContain('Watt Toolkit');
     expect(message).not.toContain('Steam++');
@@ -189,15 +250,14 @@ describe('literal loopback block messages', () => {
   const allowHint =
     'allow it with --allow-private-network, or: modsearch config set allowPrivateNetwork true';
 
-  it.each([
-    'http://127.23.45.67/',
-    'http://[::1]/',
-    'http://[::ffff:127.1.2.3]/',
-  ])('names a hosts-file accelerator for %s', async (url) => {
-    await expect(assertSafeRemoteTarget(new URL(url), false)).rejects.toThrow(
-      new RegExp(`Watt Toolkit / Steam\\+\\+.*${allowHint}`),
-    );
-  });
+  it.each(['http://127.23.45.67/', 'http://[::1]/', 'http://[::ffff:127.1.2.3]/'])(
+    'names a hosts-file accelerator for %s',
+    async (url) => {
+      await expect(assertSafeRemoteTarget(new URL(url), false)).rejects.toThrow(
+        new RegExp(`Watt Toolkit / Steam\\+\\+.*${allowHint}`),
+      );
+    },
+  );
 
   it('keeps the literal non-loopback private message unchanged', async () => {
     await expect(assertSafeRemoteTarget(new URL('http://10.0.0.5/'), false)).rejects.toThrow(

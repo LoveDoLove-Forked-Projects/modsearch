@@ -97,21 +97,25 @@ Force one engine with `-e <name>` when you need to be sure.
 ## Blocked private network target
 
 ```
-Blocked private network target: example.com -> 198.18.91.58. If a VPN or proxy on
-this machine maps public hosts into reserved ranges, allow it with
+Blocked private network target: example.com -> 10.0.0.5. If a VPN or proxy on
+this machine maps public hosts into reserved ranges outside the 198.18.0.0/15
+fake-IP pool, allow it with
 --allow-private-network, or: modsearch config set allowPrivateNetwork true
 ```
 
 ```
 Blocked private network target: github.com -> 127.0.0.1. If a VPN or proxy on
-this machine maps public hosts into reserved ranges, or a hosts-file accelerator
-(such as Watt Toolkit / Steam++) points public domains at 127.0.0.1, allow it with
+this machine maps public hosts into reserved ranges outside the 198.18.0.0/15
+fake-IP pool, or a hosts-file accelerator (such as Watt Toolkit / Steam++) points
+public domains at 127.0.0.1, allow it with
 --allow-private-network, or: modsearch config set allowPrivateNetwork true
 ```
 
-The SSRF guard refused an address in a reserved range. Three different causes:
+Proxy fake-IP mode in Clash, Clash Verge Rev, mihomo, and Surge works out of the box. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders and need no `allowPrivateNetwork` switch. This applies only to DNS answers. A literal URL such as `http://198.18.0.5/` is still blocked when the switch is off.
 
-- **A VPN or proxy** mapping public hostnames into ranges like `198.18.0.0/15`. Common with split-tunnel clients. Allow it with the flag or the config setting above.
+The SSRF guard refused a private or reserved address. Three possible causes:
+
+- **A VPN or proxy** mapping public hostnames into other reserved ranges, such as `10.0.0.0/8`. This can happen with split-tunnel clients. Allow it with the flag or the config setting above.
 - **A hosts-file accelerator** such as Watt Toolkit / Steam++. It writes public domains into the hosts file pointing at `127.0.0.1`, and a local process listens on 443 and forwards. Allow it with `modsearch config set allowPrivateNetwork true`. After allowing, modsearch automatically trusts the OS certificate store on Node 22.15+, so a certificate issued by the proxy's locally installed CA can verify. Node 22.13 and 22.14 cannot read the OS store through this API, so upgrade to 22.15+. To enable system CAs for the whole Node process, `NODE_OPTIONS=--use-system-ca` is available on Node 22.15+, while `NODE_USE_SYSTEM_CA=1` requires Node 22.19+ or 24.6+. Firecrawl is a cloud engine and cannot reach loopback on this machine. This case only works with the local engine.
 - **A genuinely internal address**, which is exactly what the guard exists for. Do not disable the guard to reach it.
 

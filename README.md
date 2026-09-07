@@ -121,7 +121,7 @@ Once installed, you do not need to remember any commands. Just chat. Ask anythin
 | [Security](docs/security.md) | SSRF guards, DNS-rebinding protection, untrusted input |
 | [CHANGELOG](CHANGELOG.md) | Finding what changed in a version |
 
-GitHub and other sites blocked because Steam++ / Watt Toolkit or a VPN pointed them at this machine or a reserved address? See [Blocked private network target](docs/troubleshooting.md#blocked-private-network-target).
+Proxy fake-IP mode (Clash, Clash Verge Rev, mihomo, Surge) works out of the box. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders with no switch needed. Literal URLs such as `http://198.18.0.5/` stay blocked when `allowPrivateNetwork` is off. For other reserved ranges used by VPNs or hosts-file accelerators such as Steam++ / Watt Toolkit, see [Blocked private network target](docs/troubleshooting.md#blocked-private-network-target).
 
 ## Contributing
 

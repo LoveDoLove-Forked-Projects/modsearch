@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Local fetch now works in proxy fake-IP mode (Clash, Clash Verge Rev, mihomo, Surge) without `allowPrivateNetwork`. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders and the connection stays pinned to the checked address. Literal URLs such as `http://198.18.0.5/` remain blocked when the switch is off (#26).
+
+
 ## 5.10.1 - 2026-09-04
 
 - The English and Chinese README installation sections now offer the canonical skills.sh command, `npx skills add liustack/modsearch`, alongside the agent-directed `INSTALL.md` path. This gives users who prefer a direct installer one command without changing the agent-first setup flow.

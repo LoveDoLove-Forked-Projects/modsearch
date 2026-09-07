@@ -68,7 +68,7 @@ JSON has no comments, so here is every field:
 | :-- | :-- | :-- | :-- |
 | `engine` | string | top level | Which engine searches. Empty means automatic (the best available here). One of `antigravity-cli`, `tavily`, `exa`, `firecrawl`. The aliases `agy`, `antigravity`, `grok`, `http`, `direct` are accepted and normalized to the canonical name. |
 | `cooldown` | `"on"` / `"off"` | top level | Quota cooldown failover. On by default. Off reads and writes no state and routes exactly as before. |
-| `allowPrivateNetwork` | boolean | top level | Local network policy: allow the local fetcher to reach reserved and private address ranges. It never authorizes Firecrawl cloud disclosure. Literal private and reserved targets always stay off the cloud. For hostname DNS answers, Firecrawl treats `198.18.0.0/15` as a likely fake-IP placeholder and withholds the URL only when every resolved address is genuinely private or reserved. `false` by default. |
+| `allowPrivateNetwork` | boolean | top level | Allow the local fetcher to reach private or reserved addresses, including other VPN ranges and hosts-file accelerators. Default `false`. DNS answers in `198.18.0.0/15` already pass as fake-IP placeholders without this switch. Literal URLs in that range stay blocked while it is off. This setting never authorizes Firecrawl cloud disclosure. Literal private and reserved targets always stay off the cloud. For DNS answers, Firecrawl withholds the URL only when every address is private or reserved after the fake-IP exemption. |
 | `engines` | object | top level | Per-engine settings, keyed by canonical engine name. |
 | `engines.<name>.enabled` | boolean | every engine | Whether automatic routing may use this engine. Missing means enabled. Set `false` to exclude it. Setting `true` removes the override and returns to the built-in default. An explicit `--engine` still forces that engine for one run. |
 | `engines.<name>.apiKey` | string | `tavily`, `exa`, `firecrawl` | One API key, or multiple keys separated by commas. Whitespace and empty comma items are ignored. Authentication, rate-limit, and quota failures rotate through the keys in order. Network, 5xx, and parsing failures go directly to the next engine. Also settable via `TAVILY_API_KEY` / `EXA_API_KEY` / `FIRECRAWL_API_KEY`, which win over the file. |
@@ -177,7 +177,9 @@ Nothing else to turn on. An X-flavored query goes to X automatically once `grok`
 
 The built-in direct fetcher (`http` and `direct` still work as aliases). No setup. It carries SSRF guards (private ranges, cloud metadata, per-hop redirect checks, size caps) and pins each connection to the validated IP, so DNS rebinding cannot slip past. It runs no JavaScript, so it is not a full browser sandbox: still run untrusted URLs in a sandboxed working directory.
 
-A VPN that maps public hosts into reserved ranges will trip those guards:
+Proxy fake-IP mode in Clash, Clash Verge Rev, mihomo, and Surge works out of the box. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders, so no switch is needed. The connection stays pinned to the checked fake IP, with the hostname kept for the Host header and TLS SNI. A literal URL such as `http://198.18.0.5/` is still blocked when `allowPrivateNetwork` is off.
+
+A split-tunnel VPN that maps public hosts into other reserved ranges, or a hosts-file accelerator such as Watt Toolkit / Steam++ that maps them to loopback, still needs the local-only waiver:
 
 ```bash
 modsearch -u <url> --allow-private-network

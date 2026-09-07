@@ -68,7 +68,7 @@ JSON 不支持注释，所以每个字段的说明在这里：
 | :-- | :-- | :-- | :-- |
 | `engine` | string | 顶层 | 由哪个引擎搜索。空表示自动（用本机可用的最好那个）。取值 `antigravity-cli`、`tavily`、`exa`、`firecrawl` 之一。别名 `agy`、`antigravity`、`grok`、`http`、`direct` 也接受，会归一为正式名。 |
 | `cooldown` | `"on"` / `"off"` | 顶层 | 额度冷却故障转移。默认开。关掉后不读不写任何状态，路由与从前完全一致。 |
-| `allowPrivateNetwork` | boolean | 顶层 | 本地网络策略：允许本地抓取器访问保留和私有地址段。它从不授权 Firecrawl 云端披露。URL 中直写的私有和保留地址目标始终不会发往云端。主机名的 DNS 结果采用更窄的规则。Firecrawl 把 `198.18.0.0/15` 视为疑似 fake-ip 占位值，只有所有解析地址都是真私网或保留地址时才会拒绝披露。默认 `false`。 |
+| `allowPrivateNetwork` | boolean | 顶层 | 允许本地抓取器访问私有或保留地址，包括 VPN 使用的其他保留地址段和 hosts 文件加速器。默认 `false`。DNS 返回的 `198.18.0.0/15` 地址已按 fake-ip 占位值放行，无需此开关。在 URL 中直写该地址段，开关关闭时仍会被拦截。此设置从不授权 Firecrawl 云端披露，URL 中直写的私有和保留目标始终不会发往云端。对于 DNS 结果，只有应用 fake-ip 例外后所有地址仍被判为私有或保留地址时，Firecrawl 才会拒绝披露。 |
 | `engines` | object | 顶层 | 按引擎正式名分组的每引擎设置。 |
 | `engines.<name>.enabled` | boolean | 所有引擎 | 是否允许自动路由使用该引擎。省略表示启用。设为 `false` 会排除它，设为 `true` 会删除覆盖并回到内置默认。单次显式 `--engine` 仍会强制使用该引擎。 |
 | `engines.<name>.apiKey` | string | `tavily`、`exa`、`firecrawl` | 一个 API key，或用英文逗号分隔的多个 key。解析时会忽略空白和空项。鉴权、限流或配额失败时按顺序轮换 key。网络、5xx 或解析失败时直接切换下一个引擎。也可用环境变量 `TAVILY_API_KEY` / `EXA_API_KEY` / `FIRECRAWL_API_KEY`，环境变量优先于文件。 |
@@ -176,7 +176,9 @@ grok    # 用户用 SuperGrok 或 X Premium 登录
 
 内置的直连抓取器（别名 `http` 和 `direct` 仍然可用）。无需设置。它带 SSRF 防护（私有地址段、云元数据、每一跳重定向检查、大小上限），并把连接钉在校验过的 IP 上，DNS 重绑定钻不过去。它不跑 JavaScript，也不是完整的浏览器沙箱：抓不可信的 URL 时，仍应在沙箱工作目录里跑。
 
-把公网主机名映射进保留地址段的 VPN 会触发这些防护：
+Clash、Clash Verge Rev、mihomo 和 Surge 的代理 fake-ip 模式开箱即用。DNS 返回的 `198.18.0.0/15` 地址会被视为 fake-ip 占位值，无需开启任何开关。连接仍固定到检查过的 fake-ip，Host 请求头和 TLS SNI 保留原域名。在 URL 中直接写 `http://198.18.0.5/`，`allowPrivateNetwork` 关闭时仍会被拦截。
+
+如果分流 VPN 把公网主机名映射进其他保留地址段，或 Watt Toolkit / Steam++ 等 hosts 文件加速器将其指向回环地址，仍需用仅对本地抓取生效的开关放行：
 
 ```bash
 modsearch -u <url> --allow-private-network
