@@ -174,7 +174,7 @@ export function parseGrokOutput(stdout: string): EngineOutput {
 }
 
 const IN_PROGRESS_PLACEHOLDER =
-  /进行中|尚未完成|正在|检索中|in progress|searching|not (yet )?(finished|complete)/i;
+  /进行中|尚未完成|正在(检索|搜索|查找|搜)|检索中|搜索中|in progress|(still|now|currently) searching|not (yet )?(finished|complete)/i;
 
 function isInProgressPlaceholder(result: unknown): boolean {
   if (!result || typeof result !== 'object' || Array.isArray(result)) {

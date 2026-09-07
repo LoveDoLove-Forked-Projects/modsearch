@@ -116,6 +116,17 @@ describe('grok engine', () => {
     ).toThrow(/Grok Build stopped before searching X \(placeholder result\)/);
   });
 
+  it('keeps a finished result with no posts, even when it mentions searching', () => {
+    const parsed = parseGrokOutput(
+      JSON.stringify({
+        structuredOutput: null,
+        text: '{"summary":"Searching X for this handle returned no posts this week.","items":[],"uncertainty":["Nothing matched the query."]}',
+        stopReason: 'end_turn',
+      }),
+    );
+    expect((parsed.result as { items: unknown[] }).items).toEqual([]);
+  });
+
   it('salvages a trailing JSON object after prose in text', () => {
     const resultJson = {
       summary: 'This week on X, Claude Code news came from official accounts.',
