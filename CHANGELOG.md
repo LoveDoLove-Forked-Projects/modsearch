@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Local fetch now honors the system HTTP proxy (`http_proxy` / `https_proxy` / `no_proxy`) (#30). When a proxy is selected, the request is forwarded through it. The proxy does DNS, so the socket is not pinned to a checked IP. Direct fetches keep IP pinning. A proxied run sets `meta.proxied` and adds a warning that the hostname was resolved by the proxy.
+
 ## 5.10.2 - 2026-09-08
 
 - Local fetch now works in proxy fake-IP mode (Clash, Clash Verge Rev, mihomo, Surge) without `allowPrivateNetwork`. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders and the connection stays pinned to the checked address. Literal URLs such as `http://198.18.0.5/` remain blocked when the switch is off (#26).

@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModsearchConfig } from './config.ts';
 import {
   buildCooldownController,
@@ -69,7 +69,19 @@ describe('mode resolution', () => {
 });
 
 describe('zero-config machine', () => {
-  afterEach(() => cleanupTempDirs());
+  beforeEach(() => {
+    vi.stubEnv('http_proxy', '');
+    vi.stubEnv('https_proxy', '');
+    vi.stubEnv('HTTP_PROXY', '');
+    vi.stubEnv('HTTPS_PROXY', '');
+    vi.stubEnv('no_proxy', '');
+    vi.stubEnv('NO_PROXY', '');
+  });
+
+  afterEach(() => {
+    cleanupTempDirs();
+    vi.unstubAllEnvs();
+  });
 
   it('searches through keyless firecrawl on a bare machine, failing honestly offline', async () => {
     // Nothing installed, no keys, no config file: keyless firecrawl is the
@@ -529,7 +541,19 @@ describeSpawn('multiple sources run concurrently and fail independently', () => 
 });
 
 describe('uncertainty, warnings, and attempts are separate channels', () => {
-  afterEach(() => cleanupTempDirs());
+  beforeEach(() => {
+    vi.stubEnv('http_proxy', '');
+    vi.stubEnv('https_proxy', '');
+    vi.stubEnv('HTTP_PROXY', '');
+    vi.stubEnv('HTTPS_PROXY', '');
+    vi.stubEnv('no_proxy', '');
+    vi.stubEnv('NO_PROXY', '');
+  });
+
+  afterEach(() => {
+    cleanupTempDirs();
+    vi.unstubAllEnvs();
+  });
 
   itSpawn(
     'keeps the engine epistemic uncertainty, routing goes to warnings',

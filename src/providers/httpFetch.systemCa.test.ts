@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { agentCtor, tlsState } = vi.hoisted(() => ({
+const { agentCtor, envProxyCtor, tlsState } = vi.hoisted(() => ({
   agentCtor: vi.fn(),
+  envProxyCtor: vi.fn(),
   tlsState: {
     getCACertificates: undefined as undefined | ((type?: string) => string[]),
   },
@@ -11,6 +12,14 @@ vi.mock('undici', () => ({
   Agent: class {
     constructor(opts: unknown) {
       agentCtor(opts);
+    }
+    close() {
+      return Promise.resolve();
+    }
+  },
+  EnvHttpProxyAgent: class {
+    constructor(opts: unknown) {
+      envProxyCtor(opts);
     }
     close() {
       return Promise.resolve();
@@ -58,18 +67,33 @@ function lastConnect(): ConnectOpts {
 async function loadRunFetch(): Promise<typeof import('./httpFetch.ts').runFetch> {
   vi.resetModules();
   agentCtor.mockClear();
+  envProxyCtor.mockClear();
   const { runFetch } = await import('./httpFetch.ts');
   return runFetch;
 }
+
+const PROXY_ENV_KEYS = [
+  'http_proxy',
+  'https_proxy',
+  'HTTP_PROXY',
+  'HTTPS_PROXY',
+  'no_proxy',
+  'NO_PROXY',
+] as const;
 
 describe('system CA when allowPrivateNetwork is true', () => {
   beforeEach(() => {
     stubFetch();
     agentCtor.mockClear();
+    envProxyCtor.mockClear();
+    for (const key of PROXY_ENV_KEYS) {
+      vi.stubEnv(key, '');
+    }
   });
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('does not read the system store when the flag is off', async () => {
@@ -146,5 +170,44 @@ describe('system CA when allowPrivateNetwork is true', () => {
     const runFetch = await loadRunFetch();
     await runFetch({ url: 'http://127.0.0.1/', allowPrivateNetwork: true });
     expect(lastConnect().ca).toBeUndefined();
+  });
+
+  it('passes merged CAs to the proxy dispatcher without pinning lookup', async () => {
+    vi.stubEnv('http_proxy', 'http://127.0.0.1:9');
+    const getCACertificates = vi.fn((type?: string) => {
+      if (type === 'default') {
+        return ['CERT_DEFAULT', 'CERT_SHARED'];
+      }
+      if (type === 'system') {
+        return ['CERT_SYSTEM', 'CERT_SHARED'];
+      }
+      return [];
+    });
+    tlsState.getCACertificates = getCACertificates;
+    const runFetch = await loadRunFetch();
+    await runFetch({ url: 'http://127.0.0.1/', allowPrivateNetwork: true });
+    expect(agentCtor).not.toHaveBeenCalled();
+    const opts = envProxyCtor.mock.calls.at(-1)?.[0] as
+      | {
+          httpProxy?: string;
+          httpsProxy?: string;
+          noProxy?: string;
+          connect?: ConnectOpts;
+          requestTls?: { ca?: string[] };
+          proxyTls?: { ca?: string[] };
+        }
+      | undefined;
+    expect(opts).toBeDefined();
+    expect(opts?.httpProxy).toBe('http://127.0.0.1:9');
+    expect(opts?.httpsProxy).toBe('http://127.0.0.1:9');
+    expect(opts?.noProxy).toBe('');
+    // ProxyAgent ignores AgentOptions.connect. Origin TLS is requestTls,
+    // TLS to the proxy is proxyTls.
+    expect(opts?.connect).toBeUndefined();
+    const merged = expect.arrayContaining(['CERT_DEFAULT', 'CERT_SYSTEM', 'CERT_SHARED']);
+    expect(opts?.requestTls?.ca).toEqual(merged);
+    expect(opts?.proxyTls?.ca).toEqual(merged);
+    expect(opts?.requestTls?.ca?.filter((cert) => cert === 'CERT_SHARED')).toHaveLength(1);
+    expect(opts?.proxyTls?.ca?.filter((cert) => cert === 'CERT_SHARED')).toHaveLength(1);
   });
 });

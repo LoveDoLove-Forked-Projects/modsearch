@@ -19,13 +19,13 @@
 从这张表能推出两个事实，它们回答大多数问题：
 
 - **单页抓取零配置可用。** `local` 引擎零安装，默认是抓取的最后兜底。只有用户明确禁用它时才会离开自动链。
-- **网页搜索无需配置。** Firecrawl 的免注册免费额度（每月 1,000 credits，无需注册）开箱就能扛。配置了 `engine` 时以配置为准。
+- **网页搜索可在 Firecrawl 免注册免费额度上运行**（每月 1,000 credits，无需注册）。配置了 `engine` 时以配置为准。搜索链不含 `local`，因为 `local` 不能搜索。Firecrawl 被限流时，搜索至少还需要一个带 key 的引擎或 `agy` 作为后备。抓取仍有 `local` 兜底。
 
 X 是独立语料，不是竞争的搜索引擎，所以它永远不会顶替网页搜索。`--source` 选语料，`--engine` 选工具。
 
 ## 零配置
 
-modsearch 没有配置文件也能跑：装完就在 Firecrawl 的免注册免费额度上搜索和抓取。它看这台机器上有什么，用最好的那个。只有用户想改变这一点时才需要建配置。
+modsearch 没有配置文件也能跑：抓取有 `local` 兜底，搜索走 Firecrawl 的免注册免费额度。搜索没有 local 后备（`local` 不能搜索），所以 Firecrawl 被限流时需要一个带 key 的引擎或 `agy`。它看这台机器上有什么，用最好的那个。只有用户想改变这一点时才需要建配置。
 
 首选的免费升级是 Antigravity CLI，它写带引用的综述，一个工具同时覆盖搜索和抓取，还不要 key：
 
@@ -176,7 +176,10 @@ grok    # 用户用 SuperGrok 或 X Premium 登录
 
 内置的直连抓取器（别名 `http` 和 `direct` 仍然可用）。无需设置。它带 SSRF 防护（私有地址段、云元数据、每一跳重定向检查、大小上限），并把连接钉在校验过的 IP 上，DNS 重绑定钻不过去。它不跑 JavaScript，也不是完整的浏览器沙箱：抓不可信的 URL 时，仍应在沙箱工作目录里跑。
 
-Clash、Clash Verge Rev、mihomo 和 Surge 的代理 fake-ip 模式开箱即用。DNS 返回的 `198.18.0.0/15` 地址会被视为 fake-ip 占位值，无需开启任何开关。连接仍固定到检查过的 fake-ip，Host 请求头和 TLS SNI 保留原域名。在 URL 中直接写 `http://198.18.0.5/`，`allowPrivateNetwork` 关闭时仍会被拦截。
+两种代理形态：
+
+1. TUN + fake-ip（Clash、Clash Verge Rev、mihomo、Surge）。DNS 返回的 `198.18.0.0/15` 地址会被视为 fake-ip 占位值，无需开启任何开关。连接仍固定到检查过的 fake-ip，Host 请求头和 TLS SNI 保留原域名。在 URL 中直接写 `http://198.18.0.5/`，`allowPrivateNetwork` 关闭时仍会被拦截。
+2. 系统 HTTP 代理（`http_proxy` / `https_proxy` 环境变量，DNS 返回真实 IP）。需要设置这些环境变量。本地引擎会把请求转给代理。主机名由代理解析，所以 socket 不会钉在检查过的 IP 上。
 
 如果分流 VPN 把公网主机名映射进其他保留地址段，或 Watt Toolkit / Steam++ 等 hosts 文件加速器将其指向回环地址，仍需用仅对本地抓取生效的开关放行：
 
@@ -206,7 +209,7 @@ modsearch state clear               # 立即忘掉所有冷却
 
 ## 故障排查
 
-- `firecrawl rejected the keyless request`：免注册访问暂不可用或达到限额。配置免费 Firecrawl key，等待每日额度恢复，或改用其他引擎。
+- `firecrawl rejected the keyless request`：免注册访问暂不可用或达到限额。配置免费 Firecrawl key，等待每日额度恢复，或改用其他引擎。搜索没有 `local` 后备（`local` 不能搜索）。
 - agy 的额度报错：每周免费额度用完了。加一个带 key 的搜索引擎，或等报错里写的重置时间。冷却开着时，agy 会被自动挪到最后直到重置。
 - `exa is out of credits` / `firecrawl is out of credits`：当前额度用完了。其他搜索引擎会自动接手，冷却把耗尽的挪到最后直到恢复。
 - `Blocked private network target`：SSRF 防护。用户在 VPN 后面的话，用 `--allow-private-network` 重试。

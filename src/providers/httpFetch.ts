@@ -9,7 +9,7 @@
 // the result onto the shared engine contract. The SSRF guards live in
 // ./http/network.ts and the markup handling in ./http/htmlExtract.ts.
 import * as tls from 'node:tls';
-import { Agent } from 'undici';
+import { Agent, EnvHttpProxyAgent, type Dispatcher } from 'undici';
 import { assertSafeRemoteTarget, normalizeFetchUrl, type PinnedTarget } from './http/network.ts';
 import {
   extractLinks,
@@ -48,6 +48,8 @@ export interface FetchResult {
     maxBytes: number;
     maxChars: number;
     privateNetworkAllowed: boolean;
+    /** True if any hop used the system HTTP proxy. Always present. */
+    proxied: boolean;
   };
 }
 
@@ -65,6 +67,85 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 const DEFAULT_MAX_BYTES = 2_000_000;
 const DEFAULT_MAX_CHARS = MAX_CONTENT_CHARS;
 const DEFAULT_MAX_REDIRECTS = 4;
+
+function firstNonEmpty(values: Array<string | undefined>): string | null {
+  for (const value of values) {
+    if (value === undefined) {
+      continue;
+    }
+    const trimmed = value.trim();
+    if (trimmed !== '') {
+      return trimmed;
+    }
+  }
+  return null;
+}
+
+function proxyUriForProtocol(protocol: string, env: NodeJS.ProcessEnv): string | null {
+  if (protocol === 'http:') {
+    return firstNonEmpty([env.http_proxy, env.HTTP_PROXY]);
+  }
+  if (protocol === 'https:') {
+    return firstNonEmpty([env.https_proxy, env.HTTPS_PROXY, env.http_proxy, env.HTTP_PROXY]);
+  }
+  return null;
+}
+
+function urlPort(url: URL): number {
+  if (url.port) {
+    return Number.parseInt(url.port, 10);
+  }
+  return url.protocol === 'https:' ? 443 : 80;
+}
+
+function isExcludedByNoProxy(url: URL, env: NodeJS.ProcessEnv): boolean {
+  const raw = env.no_proxy ?? env.NO_PROXY;
+  if (raw === undefined) {
+    return false;
+  }
+  const trimmed = raw.trim();
+  if (trimmed === '') {
+    return false;
+  }
+  if (trimmed === '*') {
+    return true;
+  }
+
+  const hostname = url.hostname.toLowerCase();
+  const port = urlPort(url);
+
+  for (const part of trimmed.split(/[,\s]/)) {
+    if (!part) {
+      continue;
+    }
+    if (part === '*') {
+      return true;
+    }
+    const parsed = part.match(/^(.+):(\d+)$/);
+    const hostRaw = parsed ? parsed[1] : part;
+    const entryHost = hostRaw.replace(/^\*?\./, '').toLowerCase();
+    const entryPort = parsed ? Number.parseInt(parsed[2], 10) : undefined;
+    if (entryPort !== undefined && entryPort !== port) {
+      continue;
+    }
+    if (hostname === entryHost || hostname.endsWith(`.${entryHost}`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Which system HTTP proxy to use for this URL, or null to go direct. */
+export function resolveProxyForUrl(url: URL, env: NodeJS.ProcessEnv): string | null {
+  const proxyUrl = proxyUriForProtocol(url.protocol, env);
+  if (!proxyUrl) {
+    return null;
+  }
+  if (isExcludedByNoProxy(url, env)) {
+    return null;
+  }
+  return proxyUrl;
+}
 
 export async function runFetch(options: FetchOptions): Promise<FetchResult> {
   const requestUrl = normalizeFetchUrl(options.url);
@@ -95,15 +176,22 @@ export async function runFetch(options: FetchOptions): Promise<FetchResult> {
   const redirectChain: string[] = [];
   // One deadline for the whole run: DNS, every redirect hop, and the body.
   const deadline = AbortSignal.timeout(timeoutMs);
-  // Every pinned dispatcher created along the way, closed when the run ends.
-  const dispatchers: Agent[] = [];
+  // Dispatchers created along the way, closed when the run ends.
+  const dispatchers: Dispatcher[] = [];
+  let proxied = false;
 
   try {
     for (let i = 0; i <= maxRedirects; i += 1) {
-      // Validate, then pin the socket to the exact IP that was validated. Each
-      // redirect hop repeats both, so a mid-run DNS change cannot slip through.
+      // Preflight every hop. Pin the socket on the direct path. A system HTTP
+      // proxy does DNS itself, so that path does not pin.
       const pinned = await assertSafeRemoteTarget(currentUrl, allowPrivateNetwork);
-      const dispatcher = pinnedDispatcher(pinned, allowPrivateNetwork);
+      const proxyUrl = resolveProxyForUrl(currentUrl, process.env);
+      const dispatcher = proxyUrl
+        ? proxyDispatcher(proxyUrl, allowPrivateNetwork)
+        : pinnedDispatcher(pinned, allowPrivateNetwork);
+      if (proxyUrl) {
+        proxied = true;
+      }
       dispatchers.push(dispatcher);
 
       const { response } = await fetchOnce(currentUrl, dispatcher, deadline, timeoutMs, userAgent);
@@ -162,6 +250,7 @@ export async function runFetch(options: FetchOptions): Promise<FetchResult> {
           maxBytes,
           maxChars,
           privateNetworkAllowed: allowPrivateNetwork,
+          proxied,
         },
       };
     }
@@ -169,11 +258,28 @@ export async function runFetch(options: FetchOptions): Promise<FetchResult> {
     throw new Error('Failed to fetch target URL.');
   } finally {
     // The body is fully read into memory before we return, so closing the
-    // pinned dispatchers here frees their sockets without cutting a live read.
+    // dispatchers here frees their sockets without cutting a live read.
     for (const dispatcher of dispatchers) {
       dispatcher.close().catch(() => {});
     }
   }
+}
+
+/**
+ * TCP goes to the proxy host, not the target, so pinning lookup to the checked
+ * IP would mis-route the socket. The proxy does DNS.
+ * ProxyAgent ignores AgentOptions.connect. Origin TLS is requestTls, TLS to
+ * the proxy is proxyTls.
+ */
+function proxyDispatcher(proxyUrl: string, allowPrivateNetwork: boolean): EnvHttpProxyAgent {
+  const ca = allowPrivateNetwork ? mergedOsCaCertificates() : undefined;
+  const tls = ca ? { ca } : undefined;
+  return new EnvHttpProxyAgent({
+    httpProxy: proxyUrl,
+    httpsProxy: proxyUrl,
+    noProxy: '',
+    ...(tls ? { requestTls: tls, proxyTls: tls } : {}),
+  });
 }
 
 /**
@@ -251,7 +357,7 @@ function mergedOsCaCertificates(): string[] | undefined {
  */
 async function fetchOnce(
   url: URL,
-  dispatcher: Agent,
+  dispatcher: Dispatcher,
   signal: AbortSignal,
   timeoutMs: number,
   userAgent: string,
@@ -271,7 +377,7 @@ async function fetchOnce(
         accept:
           'text/html,application/xhtml+xml,application/json,text/plain,application/xml,text/xml;q=0.9,*/*;q=0.5',
       },
-    } as unknown as RequestInit & { dispatcher: Agent });
+    } as unknown as RequestInit & { dispatcher: Dispatcher });
 
     return {
       response,
@@ -471,6 +577,11 @@ export async function executeHttpFetch(options: EngineRequest): Promise<EngineOu
   if (allowPrivate) {
     warnings.push(
       'Private network protection was disabled for this fetch, so the URL was trusted as given.',
+    );
+  }
+  if (result.meta.proxied) {
+    warnings.push(
+      'This request went through the system HTTP proxy. The proxy resolved the hostname, so the connection was not pinned to a checked IP.',
     );
   }
 

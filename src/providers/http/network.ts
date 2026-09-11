@@ -6,17 +6,17 @@
 // and pass without a private-network waiver. Literal URLs in that range stay
 // blocked unless the guard is waived.
 //
-// DNS rebinding is closed: assertSafeRemoteTarget resolves the hostname, checks
-// every address, and returns the exact IP it validated. The caller pins the
-// connection to that IP (via an undici Agent with a custom lookup, see
-// httpFetch.ts), so a DNS answer that changes between the check and the connect
-// can no longer point the socket at an address the check never saw. The Host
-// header and TLS SNI still carry the original hostname. Every redirect hop
-// repeats the check and re-pins.
+// DNS rebinding is closed on the direct path: assertSafeRemoteTarget resolves
+// the hostname, checks every address, and returns the exact IP it validated.
+// The caller pins the socket to that IP, so a DNS answer that changes between
+// the check and the connect cannot point the socket at an address the check
+// never saw. The Host header and TLS SNI still carry the original hostname.
+// Every redirect hop repeats the check. When a system HTTP proxy is used, the
+// proxy does DNS and the socket is not pinned. The preflight check still runs.
 import * as dns from 'dns/promises';
 import { isIP } from 'net';
 
-/** The validated connection target: connect to this exact IP, not a re-lookup. */
+/** The validated connection target: on the direct path, connect to this exact IP. */
 export interface PinnedTarget {
   /** The original hostname, kept for the Host header and TLS SNI. */
   hostname: string;
@@ -140,7 +140,7 @@ export async function assertSafeRemoteTarget(
     }
   }
 
-  // Pin to the first validated address. The connection uses exactly this IP,
+  // Return the first validated address. The direct path pins the socket here
   // so a later DNS change cannot swap in one the check never saw.
   const [chosen] = resolved;
   return { hostname, address: chosen.address, family: chosen.family };
@@ -175,8 +175,9 @@ export function isLiteralReservedTarget(url: URL): boolean {
  * prove this target private or reserved and therefore unsafe to disclose?
  *
  * This is not a security boundary. The local engine's assertSafeRemoteTarget
- * stays the SSRF guard and pins the connection. Both paths exempt DNS-derived
- * IPv4 198.18/15 fake-IP placeholders, while literal addresses stay reserved.
+ * stays the SSRF guard. The caller pins the socket on the direct path. Both
+ * paths exempt DNS-derived IPv4 198.18/15 fake-IP placeholders, while literal
+ * addresses stay reserved.
  * The local guard blocks any other private or reserved answer. This cloud check
  * allows disclosure if any answer is public or a fake-IP placeholder.
  * It never connects or pins. A DNS failure returns false

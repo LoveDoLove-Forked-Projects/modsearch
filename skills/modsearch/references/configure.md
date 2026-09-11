@@ -19,13 +19,13 @@ The search order is fixed at `firecrawl` then `antigravity-cli` then `tavily` th
 Two facts follow from this table, and they answer most questions:
 
 - **Page fetch works with no setup.** The `local` engine needs nothing installed and is the default last resort. It only leaves the automatic chain when the user explicitly disables it.
-- **Web search needs no setup.** Firecrawl's keyless free quota (1,000 credits/month, no signup) serves it out of the box. A configured `engine` choice takes precedence when set.
+- **Web search works keyless on Firecrawl's free quota** (1,000 credits/month, no signup). A configured `engine` choice takes precedence when set. The search chain does not include `local`, because `local` cannot search. If Firecrawl is rate-limited, search needs at least one keyed engine or `agy` as a fallback. Fetch still has `local` as a floor.
 
 X is a separate corpus, not a competing search engine, so it never replaces web search. `--source` chooses corpora, `--engine` chooses the tool.
 
 ## Zero setup
 
-modsearch runs with no config file at all: search and fetch work as installed on Firecrawl's keyless free quota. It looks at what is on the machine and uses the best thing available. Only create a config when the user wants to change that.
+modsearch runs with no config file at all: fetch has `local` as a floor, and search runs on Firecrawl's keyless free quota. Search has no `local` fallback (`local` cannot search), so a rate-limited Firecrawl needs a keyed engine or `agy`. It looks at what is on the machine and uses the best thing available. Only create a config when the user wants to change that.
 
 Antigravity CLI is the best free upgrade, because it synthesizes cited answers and covers both search and fetch with no key:
 
@@ -177,7 +177,10 @@ Nothing else to turn on. An X-flavored query goes to X automatically once `grok`
 
 The built-in direct fetcher (`http` and `direct` still work as aliases). No setup. It carries SSRF guards (private ranges, cloud metadata, per-hop redirect checks, size caps) and pins each connection to the validated IP, so DNS rebinding cannot slip past. It runs no JavaScript, so it is not a full browser sandbox: still run untrusted URLs in a sandboxed working directory.
 
-Proxy fake-IP mode in Clash, Clash Verge Rev, mihomo, and Surge works out of the box. DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders, so no switch is needed. The connection stays pinned to the checked fake IP, with the hostname kept for the Host header and TLS SNI. A literal URL such as `http://198.18.0.5/` is still blocked when `allowPrivateNetwork` is off.
+Two proxy shapes:
+
+1. TUN + fake-IP (Clash, Clash Verge Rev, mihomo, Surge). DNS answers in `198.18.0.0/15` are treated as fake-IP placeholders, so no switch is needed. The connection stays pinned to the checked fake IP, with the hostname kept for the Host header and TLS SNI. A literal URL such as `http://198.18.0.5/` is still blocked when `allowPrivateNetwork` is off.
+2. System HTTP proxy (`http_proxy` / `https_proxy` environment variables, DNS returns real IPs). Set those env vars. The local engine then forwards through the proxy. The proxy resolves the hostname, so the socket is not pinned to a checked IP.
 
 A split-tunnel VPN that maps public hosts into other reserved ranges, or a hosts-file accelerator such as Watt Toolkit / Steam++ that maps them to loopback, still needs the local-only waiver:
 
@@ -207,7 +210,7 @@ modsearch state clear               # forget every cooldown now
 
 ## Troubleshooting
 
-- `firecrawl rejected the keyless request`: anonymous access is unavailable or rate-limited. Set a free Firecrawl key, wait for the daily allowance to recover, or use another engine.
+- `firecrawl rejected the keyless request`: anonymous access is unavailable or rate-limited. Set a free Firecrawl key, wait for the daily allowance to recover, or use another engine. Search has no `local` fallback (`local` cannot search).
 - Quota errors from agy: the weekly free quota is spent. Add a keyed search engine, or wait for the reset named in the message. With cooldown on, agy is moved to the back on its own until it resets.
 - `exa is out of credits` / `firecrawl is out of credits`: the current budget is spent. Another search engine picks up the work, and cooldown moves the spent one to the back until it recovers.
 - `Blocked private network target`: SSRF guard. If the user is behind a VPN, retry with `--allow-private-network`.
