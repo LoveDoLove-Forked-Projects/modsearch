@@ -78,6 +78,8 @@ Two separate lists, and the split matters when you relay a result:
 - `uncertainty` is the engine's own epistemic doubt about the **facts**: a gap it
   could not fill, sources that conflict, a figure that might be stale, a page
   that came back too thin to trust. Surface these as caveats on the answer.
+  A suspected client-rendered shell signals missing content rather than an
+  empty page, even when `status` remains `ok`.
 - `warnings` is about **how the answer was produced**: an engine failed and
   another stood in, an X request was served by the web, a config key was a typo,
   a fetch followed redirects or ran with the private-network guard off. Surface

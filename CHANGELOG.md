@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Local fetch now honors the system HTTP proxy (`http_proxy` / `https_proxy` / `no_proxy`) (#30). When a proxy is selected, the request is forwarded through it. The proxy does DNS, so the socket is not pinned to a checked IP. Direct fetches keep IP pinning. A proxied run sets `meta.proxied` and adds a warning that the hostname was resolved by the proxy.
+- A Firecrawl result that comes back with no body text but still carries links is now called out as a suspected client-rendered shell, so a page whose content never rendered is no longer reported as one that may be genuinely sparse (#29).
 
 ## 5.10.2 - 2026-09-08
 
