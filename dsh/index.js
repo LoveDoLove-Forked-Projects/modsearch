@@ -64,7 +64,7 @@ export function apply(ctx, config = {}) {
   }
   // The settings card. dsh web users have no terminal, so `modsearch config
   // set` is out of reach there and an engine key had no way in. The card the
-  // browser half (dsh/client.js) contributes talks to the loopback route
+  // browser half (dsh/client.js) contributes talks to the settings route
   // below rather than to a settings schema, because the values live in
   // ~/.modsearch/config.json, shared with the CLI and every other harness.
   //
@@ -816,57 +816,12 @@ async function engineReadiness() {
   }
 }
 
-/** localhost, ::1, or anything in 127/8, matching dsh's own /api fence. */
-function isLoopbackHost(hostname) {
-  if (hostname === 'localhost' || hostname === '[::1]') {
-    return true;
-  }
-  const parts = hostname.split('.');
-  return (
-    parts.length === 4 &&
-    parts[0] === '127' &&
-    parts.every((part) => /^\d{1,3}$/.test(part) && Number(part) <= 255)
-  );
-}
-
 /**
- * The same fence dsh puts in front of its own /api, for the same two
- * confused-deputy paths. Host is the header DNS rebinding cannot forge, so it
- * must name a loopback authority: a rebound page reaches this socket carrying
- * its own domain there. Origin and Sec-Fetch-Site then rule out a cross-site
- * page on the machine itself. A read is refused the same way as a write,
- * though it carries no key: nothing about editing engine settings wants a
- * wider door.
+ * GET /modsearch/config: the summary above. POST: one card submission.
+ * Deployment authentication must cover this route. The raw webServer registry
+ * does not inherit dsh Connection authentication, and the plugin applies no
+ * Host, Origin, or Fetch Metadata policy of its own.
  */
-function isTrustedRequest(req) {
-  const host = req.headers?.host;
-  if (typeof host !== 'string' || host === '') {
-    return false;
-  }
-  let hostUrl;
-  try {
-    hostUrl = new URL(`http://${host}`);
-  } catch {
-    return false;
-  }
-  if (!isLoopbackHost(hostUrl.hostname)) {
-    return false;
-  }
-  if (req.headers?.['sec-fetch-site'] === 'cross-site') {
-    return false;
-  }
-  const origin = req.headers?.origin;
-  if (origin === undefined) {
-    return true;
-  }
-  try {
-    return new URL(origin).host === hostUrl.host;
-  } catch {
-    return false;
-  }
-}
-
-/** GET /modsearch/config: the summary above. POST: one card submission. */
 function registerConfigRoute(ctx) {
   ctx.webServer.register({
     name: 'modsearch-config',
@@ -877,10 +832,6 @@ function registerConfigRoute(ctx) {
         res.writeHead(status, { 'content-type': 'application/json' });
         res.end(JSON.stringify(body));
       };
-      if (!isTrustedRequest(req)) {
-        send(403, { error: 'request refused: this route answers same-origin loopback only' });
-        return;
-      }
       if (req.method === 'GET') {
         try {
           const summary = engineSummary();

@@ -88,7 +88,7 @@ See the [full engine configuration reference](../skills/modsearch/references/con
 
 ## Configure from the settings page
 
-The dsh web UI has no terminal, so the plugin contributes a **Search engine (ModSearch)** card to Settings → Plugins. It edits the same `~/.modsearch/config.json` as the CLI, through a loopback route the plugin registers at `/modsearch/config`.
+The dsh web UI has no terminal, so the plugin contributes a **Search engine (ModSearch)** card to Settings → Plugins. It edits the same `~/.modsearch/config.json` as the CLI, through a route the plugin registers at `/modsearch/config`.
 
 The card holds three things:
 
@@ -107,7 +107,7 @@ Key handling:
 - The browser is never sent a stored key, only whether one exists. Leaving the key box empty keeps the stored key.
 - Enter multiple keys as one comma-separated value. ModSearch tries them in order and rotates after authentication, rate-limit, or quota failures. Other failures continue through the engine fallback chain without trying every key.
 - A key from an environment variable still wins over the file at run time, and the card says so instead of pretending a save changed the answer.
-- The route answers same-origin loopback requests only. Anything else gets 403.
+- The plugin does not restrict Host, Origin, or Fetch Metadata headers, so domain-based and LAN deployments can read and save settings. Deployment authentication must cover `/modsearch/config` as well as dsh itself. This raw plugin route does not automatically inherit dsh Connection authentication.
 - The file is rewritten as a fresh `0600` file renamed into place, the same way the CLI writes it.
 
 ## Configure the dsh plugin

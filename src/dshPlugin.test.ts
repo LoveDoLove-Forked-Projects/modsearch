@@ -672,38 +672,42 @@ describe('dsh settings card route', () => {
     });
   });
 
-  it('refuses a cross-origin write, which could repoint an engine at another host', async () => {
-    await withConfig({ engine: 'tavily' }, async (handler, file) => {
-      const before = fs.readFileSync(file, 'utf-8');
-      const { status } = await callRoute(handler, {
-        ...postOf({ engine: 'exa' }),
-        headers: { host: '127.0.0.1:3080', origin: 'https://evil.example' },
-      });
-      expect(status).toBe(403);
-      expect(fs.readFileSync(file, 'utf-8')).toBe(before);
-    });
-  });
+  it.each([
+    { host: 'dsh.example.com', origin: 'https://dsh.example.com' },
+    { host: '192.168.1.10:3080', origin: 'http://192.168.1.10:3080' },
+    { host: '127.0.0.1:3080', origin: 'https://dsh.example.com' },
+    { host: 'dsh.example.com' },
+    {
+      host: '127.0.0.1:3080',
+      origin: 'https://dsh.example.com',
+      'sec-fetch-site': 'cross-site',
+    },
+  ])('reads and saves settings without a plugin host/origin policy: %j', async (headers) => {
+    await withConfig(
+      { engine: 'tavily', engines: { tavily: { apiKey: 'tvly-secret' } } },
+      async (handler, file) => {
+        const read = await callRoute(handler, {
+          method: 'GET',
+          url: '/modsearch/config',
+          headers,
+        });
+        expect(read.status).toBe(200);
+        expect(read.body.engine).toBe('tavily');
+        expect(JSON.stringify(read.body)).not.toContain('tvly-secret');
 
-  it('refuses a Host that is not loopback, which is what rebinding forges', async () => {
-    await withConfig({ engine: 'tavily' }, async (handler) => {
-      const { status } = await callRoute(handler, {
-        method: 'GET',
-        url: '/modsearch/config',
-        headers: { host: 'evil.example' },
-      });
-      expect(status).toBe(403);
-    });
-  });
-
-  it('refuses a cross-site fetch even when the headers otherwise look local', async () => {
-    await withConfig({ engine: 'tavily' }, async (handler) => {
-      const { status } = await callRoute(handler, {
-        method: 'GET',
-        url: '/modsearch/config',
-        headers: { host: '127.0.0.1:3080', 'sec-fetch-site': 'cross-site' },
-      });
-      expect(status).toBe(403);
-    });
+        const write = await callRoute(handler, {
+          ...postOf({ engine: 'exa' }),
+          headers,
+        });
+        expect(write.status).toBe(200);
+        expect(write.body.engine).toBe('exa');
+        expect(JSON.stringify(write.body)).not.toContain('tvly-secret');
+        expect(JSON.parse(fs.readFileSync(file, 'utf-8'))).toEqual({
+          engine: 'exa',
+          engines: { tavily: { apiKey: 'tvly-secret' } },
+        });
+      },
+    );
   });
 
   it('reports a broken config instead of treating it as empty', async () => {

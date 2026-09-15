@@ -88,7 +88,7 @@ modsearch config set cooldown off
 
 ## 在设置页里配置
 
-dsh 网页端没有终端，所以插件会在「设置 → 插件」里挂一张**搜索引擎（ModSearch）**卡片（dsh 自带的「网页搜索」卡片是 DeepSeek 自己的搜索提供方，两者不是一回事）。它改的就是 CLI 改的那份 `~/.modsearch/config.json`，走插件注册的回环路由 `/modsearch/config`。
+dsh 网页端没有终端，所以插件会在「设置 → 插件」里挂一张**搜索引擎（ModSearch）**卡片（dsh 自带的「网页搜索」卡片是 DeepSeek 自己的搜索提供方，两者不是一回事）。它改的就是 CLI 改的那份 `~/.modsearch/config.json`，走插件注册的路由 `/modsearch/config`。
 
 卡片管三件事：
 
@@ -107,7 +107,7 @@ Tavily、Exa、Firecrawl 的官方接口地址内置在 provider 代码里。界
 - 浏览器拿不到已保存的密钥，只知道有没有。密钥框留空保存，原密钥保持不变。
 - 多个密钥写在同一个输入框中，用英文逗号分隔。ModSearch 会按顺序尝试，鉴权、限流或配额失败时自动轮换。其他失败不会逐个尝试所有密钥，而是继续走引擎后备链。
 - 环境变量里的密钥在运行时仍然优先于配置文件，卡片会直说这一点，而不是让人以为保存改变了结果。
-- 路由只接受同源回环请求，其余一律 403。
+- 插件不限制 Host、Origin 或 Fetch Metadata 请求头，域名反代和局域网部署都可以读取、保存设置。部署时，认证必须同时覆盖 `/modsearch/config` 和 dsh 本身。这个直接注册的插件路由不会自动继承 dsh Connection 的登录认证。
 - 写盘方式与 CLI 一致：先写一个新的 0600 临时文件，再重命名覆盖。
 
 ## 配置 dsh 插件
