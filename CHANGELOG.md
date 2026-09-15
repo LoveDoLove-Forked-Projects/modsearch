@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 5.10.3 - 2026-09-15
 
+- The dsh settings route no longer restricts Host, Origin, or Fetch Metadata headers, allowing domain-based reverse proxies and LAN deployments to read and save engine settings (#31). Deployment authentication must cover `/modsearch/config`, which does not automatically inherit dsh Connection authentication. Page-fetch SSRF controls remain separate.
 - Local fetch now honors the system HTTP proxy (`http_proxy` / `https_proxy` / `no_proxy`) (#30). When a proxy is selected, the request is forwarded through it. The proxy does DNS, so the socket is not pinned to a checked IP. Direct fetches keep IP pinning. A proxied run sets `meta.proxied` and adds a warning that the hostname was resolved by the proxy.
 - A Firecrawl result that comes back with no body text but still carries links is now called out as a suspected client-rendered shell, so a page whose content never rendered is no longer reported as one that may be genuinely sparse (#29).
 
