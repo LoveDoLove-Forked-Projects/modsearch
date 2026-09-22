@@ -9,6 +9,9 @@ import { describe, expect, it } from 'vitest';
 // route is off, the key field is never a plain visible input, and the copy
 // follows dsh's own interface language.
 const SOURCE = fs.readFileSync(path.join(__dirname, '..', 'dsh', 'client.js'), 'utf-8');
+const PACKAGE_NAME: string = JSON.parse(
+  fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf-8'),
+).name;
 
 interface CardDraft extends Record<string, unknown> {
   engine: string;
@@ -28,6 +31,7 @@ interface Card {
 }
 
 interface Definition {
+  id: string;
   factory: (require: (id: string) => unknown) => {
     apply: (ctx: unknown) => void;
     __card: Card;
@@ -156,7 +160,7 @@ describe('the settings card mounts only where its route answers', () => {
         }
       },
     });
-    return { slotSpecs, injected, card: exports.__card };
+    return { slotSpecs, injected, card: exports.__card, id: definition.id };
   }
 
   it('does not mount where the route is off, instead of rendering an error', async () => {
@@ -179,6 +183,19 @@ describe('the settings card mounts only where its route answers', () => {
     expect(spec?.id).toBe('modsearch');
   });
 
+  it('registers on the Plugins page under the package name', async () => {
+    // dsh 0.1.6-alpha.2 retired settings.plugin.item: a bundle's
+    // configuration lives on its own Plugins page, dispatched by the npm
+    // package name. A card left only in the old slot never renders there,
+    // and neither does one keyed by a name the package no longer has.
+    const on = loadCard(200);
+    await settle();
+    const spec = on.slotSpecs.find((entry) => entry.name === 'plugins.bundle.config');
+    expect(spec?.key).toBe(PACKAGE_NAME);
+    // The module id is the entry name dsh-client-modules pairs with the row.
+    expect(on.id).toBe(PACKAGE_NAME);
+  });
+
   it('asks for the locale service on its own inject, not beside slots', async () => {
     // ctx.inject waits for every service it names. Naming locale beside slots
     // would mean no card at all on a host that ships no locale service, which
@@ -187,7 +204,76 @@ describe('the settings card mounts only where its route answers', () => {
     await settle();
     expect(on.injected).toContainEqual(['locale']);
     expect(on.injected).toContainEqual(['slots']);
-    expect(on.slotSpecs).toHaveLength(1);
+    expect(on.slotSpecs.map((entry) => entry.name).sort()).toEqual([
+      'plugins.bundle.config',
+      'settings.plugin.item',
+    ]);
+  });
+});
+
+describe('on the Plugins page the card is a section of the page, not a block of its own', () => {
+  // The Plugins page draws the bundle's title and description itself and
+  // hands the entry `view: 'page'`. A collapsed card under that title would
+  // make the user open the same thing twice.
+  function renderAs(props: Record<string, unknown>, states: unknown[]) {
+    const urls: string[] = [];
+    const definition = evaluate({
+      lang: 'en',
+      fetch: (url: string) => {
+        urls.push(url);
+        return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(SUMMARY) });
+      },
+    });
+    const nodes: Node[] = [];
+    let index = 0;
+    const react = {
+      createElement: (type: unknown, nodeProps: Record<string, unknown>, ...kids: unknown[]) => {
+        const node = { type, props: nodeProps ?? {}, kids };
+        nodes.push(node);
+        return node;
+      },
+      useState: () => [states[index++], () => {}],
+      useEffect: (fn: () => void) => {
+        fn();
+      },
+      useCallback: (fn: unknown) => fn,
+    };
+    const Input = function Input() {
+      return null;
+    };
+    const Card = definition.factory(() => ({})).__card.ConfigCard(react, { Input }) as (
+      props?: Record<string, unknown>,
+    ) => unknown;
+    return { out: Card(props), nodes, urls };
+  }
+
+  it('renders the form open, with no collapse toggle of its own', () => {
+    const draft = evaluate({})
+      .factory(() => ({}))
+      .__card.nextDraft(SUMMARY, 'tavily');
+    const { nodes } = renderAs({ view: 'page' }, [false, SUMMARY, draft, '']);
+    expect(nodes.some((node) => 'aria-expanded' in node.props)).toBe(false);
+    expect(nodes.some((node) => node.type === 'select')).toBe(true);
+    expect(nodes.some((node) => node.type === 'h4' && node.kids.includes('Engine settings'))).toBe(
+      true,
+    );
+  });
+
+  it('loads as soon as the page shows it, without waiting for a click', () => {
+    const { urls } = renderAs({ view: 'page' }, [false, null, null, '']);
+    expect(urls).toEqual(['/modsearch/config?doctor=1']);
+  });
+
+  it('answers a summary view with its one-liner and loads nothing', () => {
+    const { out, urls } = renderAs({ view: 'summary' }, [false, null, null, '']);
+    expect(out).toBe('Search engine provider configuration.');
+    expect(urls).toEqual([]);
+  });
+
+  it('keeps the collapsible card where the host passes no view', () => {
+    const { nodes, urls } = renderAs({}, [false, null, null, '']);
+    expect(nodes.some((node) => node.props['aria-expanded'] === false)).toBe(true);
+    expect(urls).toEqual([]);
   });
 });
 

@@ -1,12 +1,13 @@
 // Browser half of the modsearch dsh plugin: the settings card.
 //
 // dsh web users have no terminal, so `modsearch config set` is out of reach
-// there and an engine key had no way in. dsh renders a fixed set of plugin
-// cards and does not enumerate settings namespaces, so this card is
-// contributed through the `settings.plugin.item` slot rather than declared as
-// a schema. It reads and writes the plugin's own loopback route, which owns
-// ~/.modsearch/config.json: the browser never sees an API key, and never
-// sends a blank one back over a stored one.
+// there and an engine key had no way in. dsh renders no generic form from a
+// settings schema, so this card is contributed through a slot rather than
+// declared as one: `plugins.bundle.config` on the Plugins page from dsh
+// 0.1.6-alpha.2 on, `settings.plugin.item` in Settings before. It reads and
+// writes the plugin's own route, which owns ~/.modsearch/config.json: the
+// browser never sees an API key, and never sends a blank one back over a
+// stored one.
 //
 // Hand-written in the lazy-CJS bundle protocol (window.__ModuleLoader__.load
 // with a factory returning cordis-plugin exports), so no build step and no
@@ -27,6 +28,9 @@ window.__ModuleLoader__.load({
     // among these would invite a decision that changes no search.
     var CHAIN_ENGINES = ENGINES.filter((name) => name !== 'local');
 
+    // The Plugins page dispatches a bundle's configuration by npm package name.
+    var PACKAGE_NAME = '@liustack/modsearch';
+
     // Two short label sets rather than a locale bundle: the card has a couple
     // of dozen strings, and a bundle would be more machinery than the thing it
     // labels.
@@ -34,6 +38,8 @@ window.__ModuleLoader__.load({
       en: {
         title: 'Search engine (ModSearch)',
         subtitle: 'Search engine provider configuration.',
+        // The heading on the Plugins page, which already names the plugin.
+        section: 'Engine settings',
         automatic: 'Automatic (chain order decides)',
         // The keyless default is stated in the list, where an engine is chosen.
         keylessSuffix: ' (keyless free tier)',
@@ -74,6 +80,7 @@ window.__ModuleLoader__.load({
         // 「视觉引擎（ModLens）」成对。
         title: '搜索引擎（ModSearch）',
         subtitle: '搜索引擎提供商配置。',
+        section: '引擎设置',
         automatic: '自动（按故障转移顺序）',
         keylessSuffix: '（免注册免费）',
         pickToConfigure: '在上面选一个引擎，才能配置它的密钥和地址。',
@@ -448,7 +455,11 @@ window.__ModuleLoader__.load({
           }),
         );
 
-      return function ModsearchCard() {
+      // `view` is the Plugins page's question (dsh 0.1.6-alpha.2 on): 'page'
+      // for the form on the bundle's page, 'summary' for a one-liner.
+      // Settings on older hosts passes none and gets the collapsible card.
+      return function ModsearchCard(props) {
+        var view = props ? props.view : undefined;
         // Subscribed, not sampled: the language is a live setting, and a card
         // sitting open while the user switches has to follow. getSnapshot and
         // subscribe are the pair dsh documents as useSyncExternalStore-safe.
@@ -465,7 +476,10 @@ window.__ModuleLoader__.load({
         var summaryState = react.useState(null);
         var draftState = react.useState(null);
         var noteState = react.useState('');
-        var open = openState[0];
+        // The page already heads the form with the plugin's title, so the form
+        // is open from the start there: a collapsed block under that title
+        // would ask for the same click twice.
+        var open = view === 'page' || openState[0];
         var summary = summaryState[0];
         var draft = draftState[0];
         var note = noteState[0];
@@ -514,6 +528,10 @@ window.__ModuleLoader__.load({
             })
             .catch(() => {});
         }, []);
+
+        if (view === 'summary') {
+          return t.subtitle;
+        }
 
         // A row wrapping ONE control is a label, which names that control. A
         // row wrapping a set of them must not be: the label would become the
@@ -902,6 +920,23 @@ window.__ModuleLoader__.load({
           }
         }
 
+        if (view === 'page') {
+          // Sized like the page's own section headings, so the form reads as
+          // one more section of the bundle's page.
+          return h(
+            'div',
+            null,
+            h(
+              'h4',
+              {
+                style: { margin: '0 0 4px', fontSize: '14px', lineHeight: '20px', fontWeight: 500 },
+              },
+              t.section,
+            ),
+            body,
+          );
+        }
+
         return h(
           'div',
           {
@@ -1020,6 +1055,13 @@ window.__ModuleLoader__.load({
       }
       var ui = require('@deepseek-ai/dsh-client-ui-primitives');
       var Card = ConfigCard(react, ui, localeRef);
+      // slots.inject waits until a slot is declared, so each host fills the
+      // one it has and the other wait never fires: from dsh 0.1.6-alpha.2 on
+      // hosts declare only the Plugins page's, older ones only the Settings
+      // one.
+      ctx.slots.inject('plugins.bundle.config', function* () {
+        yield ctx.slots.register({ name: 'plugins.bundle.config', key: PACKAGE_NAME }, Card);
+      });
       ctx.slots.inject('settings.plugin.item', function* () {
         // id for rc.6's list slot, key for rc.7's keyed one: one client serves
         // both, and the key has to match the settings namespace the host half
