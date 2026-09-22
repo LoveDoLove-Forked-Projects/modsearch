@@ -831,9 +831,15 @@ async function engineReadiness() {
  * Deployment authentication must cover this route. The raw webServer registry
  * does not inherit dsh Connection authentication, and the plugin applies no
  * Host, Origin, or Fetch Metadata policy of its own.
+ *
+ * The registry hands back a disposer and ties it to nobody's lifetime, and
+ * the server outlives this plugin: the Plugins page switches a bundle off and
+ * on without a restart. Held by an effect, the route goes when the plugin
+ * does. Left loose, it kept serving the config file for a plugin that was off
+ * and made the next switch-on a duplicate registration.
  */
 function registerConfigRoute(ctx) {
-  ctx.webServer.register({
+  const route = {
     name: 'modsearch-config',
     kind: 'exact',
     path: '/modsearch/config',
@@ -882,7 +888,8 @@ function registerConfigRoute(ctx) {
         send(400, { error: String(error?.message ?? error) });
       }
     },
-  });
+  };
+  ctx.effect(() => ctx.webServer.register(route), 'modsearch: settings route');
 }
 
 // The half of the settings card that lives on this side of the socket,

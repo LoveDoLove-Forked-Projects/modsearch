@@ -316,9 +316,13 @@ interface Namespace {
 
 /**
  * A host that offers webServer and settings on scoped injects, like dsh's web
- * profile. `settings` replaces the service: dsh before 0.1.7 served the
- * namespace registry recorded here, 0.1.7 serves Config forms with no
- * register at all, and `null` is a host that serves no settings service.
+ * profile. Each scope collects what its `effect` calls return and runs them
+ * on `unload()`, the way cordis tears down a plugin that is switched off, and
+ * the route table refuses a second route on one path, as dsh's does. The
+ * webServer outlives the plugin, so a later `apply` models switching it back
+ * on. `settings` replaces the service: dsh before 0.1.7 served the namespace
+ * registry recorded here, 0.1.7 serves Config forms with no register at all,
+ * and `null` is a host that serves no settings service.
  */
 function house(options: { settings?: Record<string, unknown> | null } = {}) {
   const routes: Record<string, RouteHandler> = {};
@@ -326,9 +330,24 @@ function house(options: { settings?: Record<string, unknown> | null } = {}) {
   const injected: string[][] = [];
   const tools = new Map<string, RegisteredTool>();
   const providers: RegisteredProvider[] = [];
+  let disposers: Array<() => void> = [];
+  const scope = (services: Record<string, unknown>) => ({
+    ...services,
+    effect: (execute: () => () => void) => {
+      const dispose = execute();
+      disposers.push(dispose);
+      return dispose;
+    },
+  });
   const webServer = {
-    register: (route: { name: string; handler: RouteHandler }) => {
+    register: (route: { name: string; path: string; handler: RouteHandler }) => {
+      if (Object.hasOwn(routes, route.name)) {
+        throw new Error(`webserver: duplicate exact route "${route.path}"`);
+      }
       routes[route.name] = route.handler;
+      return () => {
+        delete routes[route.name];
+      };
     },
   };
   const ctx = {
@@ -345,21 +364,29 @@ function house(options: { settings?: Record<string, unknown> | null } = {}) {
     inject: (deps: string[], run: (scope: unknown) => void) => {
       injected.push(deps);
       if (deps.includes('webServer')) {
-        run({ webServer });
+        run(scope({ webServer }));
       }
       if (deps.includes('settings') && options.settings !== null) {
-        run({
-          settings: options.settings ?? {
-            register: (ns: string, schema: Namespace['schema'], registered: unknown) => {
-              namespaces.push({ ns, schema, options: registered });
-              return { get: () => ({}), watch: () => () => {} };
+        run(
+          scope({
+            settings: options.settings ?? {
+              register: (ns: string, schema: Namespace['schema'], registered: unknown) => {
+                namespaces.push({ ns, schema, options: registered });
+                return { get: () => ({}), watch: () => () => {} };
+              },
             },
-          },
-        });
+          }),
+        );
       }
     },
   };
-  return { routes, namespaces, injected, tools, providers, ctx };
+  const unload = () => {
+    for (const dispose of disposers.splice(0).reverse()) {
+      dispose();
+    }
+    disposers = [];
+  };
+  return { routes, namespaces, injected, tools, providers, ctx, unload };
 }
 
 async function callRoute(
@@ -929,6 +956,29 @@ describe('dsh settings card route', () => {
     expect(stage.routes['modsearch-config']).toBeDefined();
     expect([...stage.tools.keys()].sort()).toEqual(['read_page', 'x_search']);
     expect(stage.providers).toHaveLength(1);
+  });
+
+  it('takes the route down with the plugin, so switching it back on serves it again', async () => {
+    // The Plugins page switches a bundle off and on without restarting dsh.
+    // A route left behind kept reading and writing the config file for a
+    // plugin that was off, and made the next registration a duplicate.
+    // @ts-expect-error untyped on purpose
+    const plugin = (await import('../dsh/index.js')) as {
+      apply: (ctx: unknown, config?: Record<string, unknown>) => void;
+    };
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const stage = house();
+      plugin.apply(stage.ctx as never, {});
+      expect(stage.routes['modsearch-config']).toBeDefined();
+      stage.unload();
+      expect(stage.routes['modsearch-config']).toBeUndefined();
+      plugin.apply(stage.ctx as never, {});
+      expect(stage.routes['modsearch-config']).toBeDefined();
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
   });
 
   it('registers neither the route nor the namespace when the card is switched off', async () => {
