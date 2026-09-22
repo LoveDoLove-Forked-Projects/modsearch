@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FETCH_RESULT_SCHEMA, SEARCH_RESULT_SCHEMA } from './schema.ts';
 
 const SEARCH_SCHEMA_PATH = new URL('../dsh/search-schema.json', import.meta.url);
@@ -314,30 +314,44 @@ interface Namespace {
   options: unknown;
 }
 
-/** A host that offers webServer and settings on scoped injects, like dsh's web profile. */
-function house() {
+/**
+ * A host that offers webServer and settings on scoped injects, like dsh's web
+ * profile. `settings` replaces the service: dsh before 0.1.7 served the
+ * namespace registry recorded here, 0.1.7 serves Config forms with no
+ * register at all, and `null` is a host that serves no settings service.
+ */
+function house(options: { settings?: Record<string, unknown> | null } = {}) {
   const routes: Record<string, RouteHandler> = {};
   const namespaces: Namespace[] = [];
   const injected: string[][] = [];
+  const tools = new Map<string, RegisteredTool>();
+  const providers: RegisteredProvider[] = [];
+  const webServer = {
+    register: (route: { name: string; handler: RouteHandler }) => {
+      routes[route.name] = route.handler;
+    },
+  };
   const ctx = {
-    tools: { register: () => {} },
-    web: { registerSearchProvider: () => {} },
+    tools: {
+      register: (definition: RegisteredTool) => {
+        tools.set(definition.name, definition);
+      },
+    },
+    web: {
+      registerSearchProvider: (provider: RegisteredProvider) => {
+        providers.push(provider);
+      },
+    },
     inject: (deps: string[], run: (scope: unknown) => void) => {
       injected.push(deps);
       if (deps.includes('webServer')) {
-        run({
-          webServer: {
-            register: (route: { name: string; handler: RouteHandler }) => {
-              routes[route.name] = route.handler;
-            },
-          },
-        });
+        run({ webServer });
       }
-      if (deps.includes('settings')) {
+      if (deps.includes('settings') && options.settings !== null) {
         run({
-          settings: {
-            register: (ns: string, schema: Namespace['schema'], options: unknown) => {
-              namespaces.push({ ns, schema, options });
+          settings: options.settings ?? {
+            register: (ns: string, schema: Namespace['schema'], registered: unknown) => {
+              namespaces.push({ ns, schema, options: registered });
               return { get: () => ({}), watch: () => () => {} };
             },
           },
@@ -345,7 +359,7 @@ function house() {
       }
     },
   };
-  return { routes, namespaces, injected, ctx };
+  return { routes, namespaces, injected, tools, providers, ctx };
 }
 
 async function callRoute(
@@ -877,6 +891,44 @@ describe('dsh settings card route', () => {
       expect(stage.injected).toContainEqual(['webServer']);
       expect(stage.injected).toContainEqual(['settings']);
     });
+  });
+
+  it('serves no namespace on dsh 0.1.7, which dropped the registry, and logs nothing', async () => {
+    // 0.1.7's settings service only projects volatile Config fields, and the
+    // card has been keyed by package name since 0.1.6-alpha.2. Calling the
+    // removed register put a TypeError in every harness log.
+    // @ts-expect-error untyped on purpose
+    const plugin = (await import('../dsh/index.js')) as {
+      apply: (ctx: unknown, config?: Record<string, unknown>) => void;
+    };
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const stage = house({ settings: { describe: () => [], configure: () => () => {} } });
+      plugin.apply(stage.ctx as never, {});
+      expect(stage.injected).toContainEqual(['settings']);
+      expect(stage.routes['modsearch-config']).toBeDefined();
+      expect([...stage.tools.keys()].sort()).toEqual(['read_page', 'x_search']);
+      expect(stage.providers).toHaveLength(1);
+      expect(errors).not.toHaveBeenCalled();
+    } finally {
+      errors.mockRestore();
+    }
+  });
+
+  it('keeps search and both tools on a host that serves no settings service', async () => {
+    // The settings service is optional: a profile may leave it out, and the
+    // scoped inject then never runs. Nothing else may hang on it.
+    // @ts-expect-error untyped on purpose
+    const plugin = (await import('../dsh/index.js')) as {
+      apply: (ctx: unknown, config?: Record<string, unknown>) => void;
+    };
+    const stage = house({ settings: null });
+    plugin.apply(stage.ctx as never, {});
+    expect(stage.injected).toContainEqual(['settings']);
+    expect(stage.namespaces).toEqual([]);
+    expect(stage.routes['modsearch-config']).toBeDefined();
+    expect([...stage.tools.keys()].sort()).toEqual(['read_page', 'x_search']);
+    expect(stage.providers).toHaveLength(1);
   });
 
   it('registers neither the route nor the namespace when the card is switched off', async () => {

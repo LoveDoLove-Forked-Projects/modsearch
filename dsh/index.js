@@ -80,14 +80,24 @@ export function apply(ctx, config = {}) {
         console.error(`[modsearch] settings card route skipped: ${error}`);
       }
     });
-    // Since rc.7 the settings page dispatches plugin cards by served settings
-    // namespace: a card renders only when its slot key matches a namespace the
-    // host answers for. The namespace registered here is an empty
-    // pass-through, because its whole job is to make the card dispatchable;
-    // the values stay in the config file behind the route above. The schema is
-    // duck-typed to what the seam calls on it, callable plus toJSON, so this
-    // plugin needs no dsh package import to describe nothing.
+    // From rc.7 to 0.1.6-alpha.1 the settings page dispatched plugin cards
+    // by served settings namespace: a card rendered only when its slot key
+    // matched a namespace the host answered for. The namespace registered
+    // here is an empty pass-through, because its whole job is to make the
+    // card dispatchable. The values stay in the config file behind the route
+    // above. The schema is duck-typed to what the seam calls on it, callable
+    // plus toJSON, so this plugin needs no dsh package import to describe
+    // nothing.
+    //
+    // 0.1.6-alpha.2 moved the card to the Plugins page, keyed by package name,
+    // and 0.1.7 removed the registry: its settings service only lists
+    // `.volatile()` Config fields, which this plugin has none of. A host
+    // without register has nothing to serve here, so the namespace is
+    // skipped without a word.
     ctx.inject(['settings'], (scope) => {
+      if (typeof scope.settings.register !== 'function') {
+        return;
+      }
       try {
         const passThrough = (value) => ({ ...(value ?? {}) });
         passThrough.toJSON = () => ({
