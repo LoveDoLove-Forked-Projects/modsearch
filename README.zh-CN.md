@@ -99,9 +99,9 @@ agy                                                           # 浏览器完成�
 
 选了 key 的话，发一句话给 AI 即可：「把我的 tavily key 设成 tvly-...」。
 
-dsh 用户还有一条不碰命令行的路。设置页的「插件 → 插件配置」里有一张 ModSearch 卡片：选首选引擎、填 API 密钥和自建接口地址、勾选哪些引擎参与故障转移，点保存就生效。
+dsh 用户还有一条不碰命令行的路。在 dsh 侧栏点开「插件」，进入 `@liustack/modsearch`：选首选引擎、填 API 密钥和自建接口地址、勾选哪些引擎参与故障转移，点保存就生效。0.1.6-alpha.2 之前的 dsh 版本里，同一张卡片在设置页的「插件 → 插件配置」里。
 
-![dsh 设置页里的「搜索引擎（ModSearch）」配置卡片：选首选引擎、填 API 密钥与接口地址、勾选参与故障转移的引擎](https://raw.githubusercontent.com/liustack/modsearch/main/assets/demo-dsh-settings-card.jpg)
+![dsh「插件」面板里的 ModSearch 页面：选首选引擎、填 API 密钥与接口地址、勾选参与故障转移的引擎](https://raw.githubusercontent.com/liustack/modsearch/main/assets/demo-dsh-settings-card.jpg)
 
 ## 用法
 

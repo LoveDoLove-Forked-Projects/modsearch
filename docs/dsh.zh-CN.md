@@ -15,13 +15,14 @@ ModSearch 是原生 dsh bundle。它保留 dsh 内置的 `web_search` 工具与�
 
 ## 兼容性
 
-当前 bundle 已对照 `@deepseek-ai/dsh 0.1.0-rc.7` 检查。这个版本没有改变 ModSearch 使用的三个接口：
+当前 bundle 已对照 `@deepseek-ai/dsh 0.1.7-alpha.1` 检查，设置卡片另外对照过 `0.1.5-rc.2`。这些版本保留了 ModSearch 用到的接口：
 
 - npm bundle 仍通过 `dsh.bundle.patch` 声明配置层。
 - web 接缝仍通过 `ctx.web.registerSearchProvider(...)` 接收 provider。
 - 工具仍通过 `ctx.tools.register(...)` 注册。
+- bundle 可以显示自己的设置卡片。从 0.1.6-alpha.2 起，它通过 `plugins.bundle.config` 插槽出现在「插件」面板里该 bundle 的页面上。更早的版本通过 `settings.plugin.item` 把它放在设置页里。
 
-dsh 仍是候选版本，每次升级后都应重新检查。下面的组合检查不调用模型，不需要 API key，也不消耗额度：
+dsh 仍是预览版本，每次升级后都应重新检查。下面的组合检查不调用模型，不需要 API key，也不消耗额度：
 
 ```sh
 npx -y @deepseek-ai/dsh --version
@@ -86,9 +87,9 @@ modsearch config set cooldown off
 
 完整说明见[引擎配置手册](../skills/modsearch/references/configure.zh-CN.md)和[安全说明](security.zh-CN.md)。
 
-## 在设置页里配置
+## 在网页端配置
 
-dsh 网页端没有终端，所以插件会在「设置 → 插件」里挂一张**搜索引擎（ModSearch）**卡片（dsh 自带的「网页搜索」卡片是 DeepSeek 自己的搜索提供方，两者不是一回事）。它改的就是 CLI 改的那份 `~/.modsearch/config.json`，走插件注册的路由 `/modsearch/config`。
+dsh 网页端没有终端，所以插件自带一张设置卡片。dsh 0.1.6-alpha.2 及之后的版本里，它在插件自己的页面上：在侧栏点开「插件」，进入 `@liustack/modsearch`。更早的 dsh 版本把它显示为「设置 → 插件 → 插件配置」里的**搜索引擎（ModSearch）**卡片（dsh 自带的「网页搜索」卡片是 DeepSeek 自己的搜索提供方，两者不是一回事）。无论在哪，它改的都是 CLI 改的那份 `~/.modsearch/config.json`，走插件注册的路由 `/modsearch/config`。这份文件属于当前系统用户，不属于某个 dsh profile，所以本机所有 dsh profile 和 CLI 共用同一套引擎设置。
 
 卡片管三件事：
 
@@ -109,6 +110,7 @@ Tavily、Exa、Firecrawl 的官方接口地址内置在 provider 代码里。界
 - 环境变量里的密钥在运行时仍然优先于配置文件，卡片会直说这一点，而不是让人以为保存改变了结果。
 - 插件不限制 Host、Origin 或 Fetch Metadata 请求头，域名反代和局域网部署都可以读取、保存设置。部署时，认证必须同时覆盖 `/modsearch/config` 和 dsh 本身。这个直接注册的插件路由不会自动继承 dsh Connection 的登录认证。
 - 写盘方式与 CLI 一致：先写一个新的 0600 临时文件，再重命名覆盖。
+- 这个路由只在插件开启时存在。在「插件」页关掉 bundle 会把它一起撤下，重新打开后不用重启就会恢复。
 
 ## 配置 dsh 插件
 
@@ -187,5 +189,8 @@ npx -y @deepseek-ai/dsh plugin --profile <name> remove @liustack/modsearch
 - `modsearch failed (exit ...)`：运行 `modsearch doctor`。错误会保留 CLI 尝试过的引擎。
 - `plugin list` 有包但 `--dump-config` 没有：检查 `~/.dsh/profiles/<name>/package.json` 的 `dsh.profile.bundles` 中是否存在该包。
 - Electron 又打开一个应用进程，没有运行 CLI：使用 ModSearch 5.4.3 或更高版本。插件会给子进程设置 `ELECTRON_RUN_AS_NODE=1`。
+- `settings namespace skipped: TypeError: scope.settings.register is not a function`：在 dsh 0.1.7 或更新版本上用了 ModSearch 5.10.3 或更旧版本。搜索和两个工具照常可用，只是设置卡片缺失。升级到 ModSearch 5.10.4 或更高版本。
+- 插件页上看不到 ModSearch 的设置：dsh 0.1.6-alpha.2 把插件设置搬到了插件页，而 ModSearch 5.10.3 及更旧版本只把卡片交给旧的设置页插槽。升级到 ModSearch 5.10.4 或更高版本。如果配置了 `settingsCard: false`，卡片是被有意关掉的。
+- `settings card route skipped: Error: webserver: duplicate exact route "/modsearch/config"`：ModSearch 5.10.3 或更旧版本在「插件」页关掉插件时没有撤下路由。重启 dsh，或升级到 ModSearch 5.10.4 或更高版本。
 
 CLI 自身的错误见[故障排查](troubleshooting.zh-CN.md)。

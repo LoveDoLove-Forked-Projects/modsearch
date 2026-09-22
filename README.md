@@ -99,9 +99,9 @@ agy                                                           # sign in, then ex
 
 Picked a key instead? Send one line to your AI: "set my tavily key to tvly-...".
 
-dsh users have a path that never touches the command line. Settings → Plugins → Plugin config has a ModSearch card: pick the preferred engine, fill in an API key or a self-hosted endpoint, tick which engines join failover, hit save and it takes effect.
+dsh users have a path that never touches the command line. Open **Plugins** in the dsh sidebar and pick `@liustack/modsearch`: pick the preferred engine, fill in an API key or a self-hosted endpoint, tick which engines join failover, hit save and it takes effect. On dsh releases before 0.1.6-alpha.2 the same card lives under Settings → Plugins → Plugin config.
 
-![The ModSearch card in the dsh settings page, shown in Chinese: pick the preferred engine, fill in an API key and endpoint, tick the engines that join failover](https://raw.githubusercontent.com/liustack/modsearch/main/assets/demo-dsh-settings-card.jpg)
+![The ModSearch page in the dsh Plugins panel, shown in Chinese: pick the preferred engine, fill in an API key and endpoint, tick the engines that join failover](https://raw.githubusercontent.com/liustack/modsearch/main/assets/demo-dsh-settings-card.jpg)
 
 ## Usage
 

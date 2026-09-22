@@ -15,13 +15,14 @@ ModSearch is a native dsh bundle. It keeps dsh's built-in `web_search` tool and 
 
 ## Compatibility
 
-The current bundle has been checked against `@deepseek-ai/dsh 0.1.0-rc.7`. That release keeps the three surfaces ModSearch uses unchanged:
+The current bundle has been checked against `@deepseek-ai/dsh 0.1.7-alpha.1`, and its settings card against `0.1.5-rc.2` too. These releases keep the surfaces ModSearch uses:
 
 - npm bundles still declare `dsh.bundle.patch`.
 - The web seam still accepts `ctx.web.registerSearchProvider(...)`.
 - Tools still register through `ctx.tools.register(...)`.
+- A bundle can show its own settings card. From 0.1.6-alpha.2 on it goes on the bundle's page in the Plugins panel, through the `plugins.bundle.config` slot. Earlier releases show it in Settings, through `settings.plugin.item`.
 
-dsh is still a release candidate, so check again after each dsh update. A quick composition check needs no model, API key, or quota:
+dsh is still a preview release, so check again after each dsh update. A quick composition check needs no model, API key, or quota:
 
 ```sh
 npx -y @deepseek-ai/dsh --version
@@ -86,9 +87,9 @@ No setting is required to start: search and page fetch run on Firecrawl's keyles
 
 See the [full engine configuration reference](../skills/modsearch/references/configure.md) and [security model](security.md).
 
-## Configure from the settings page
+## Configure from the web UI
 
-The dsh web UI has no terminal, so the plugin contributes a **Search engine (ModSearch)** card to Settings → Plugins. It edits the same `~/.modsearch/config.json` as the CLI, through a route the plugin registers at `/modsearch/config`.
+The dsh web UI has no terminal, so the plugin brings its own settings card. On dsh 0.1.6-alpha.2 and later it sits on the plugin's page: open **Plugins** in the sidebar and pick `@liustack/modsearch`. Earlier dsh releases show it as a **Search engine (ModSearch)** card under Settings → Plugins → Plugin config. Either way it edits the same `~/.modsearch/config.json` as the CLI, through a route the plugin registers at `/modsearch/config`. That file belongs to your user account, not to a dsh profile, so every dsh profile on this machine and the CLI share one set of engine settings.
 
 The card holds three things:
 
@@ -109,6 +110,7 @@ Key handling:
 - A key from an environment variable still wins over the file at run time, and the card says so instead of pretending a save changed the answer.
 - The plugin does not restrict Host, Origin, or Fetch Metadata headers, so domain-based and LAN deployments can read and save settings. Deployment authentication must cover `/modsearch/config` as well as dsh itself. This raw plugin route does not automatically inherit dsh Connection authentication.
 - The file is rewritten as a fresh `0600` file renamed into place, the same way the CLI writes it.
+- The route exists only while the plugin is on. Switching the bundle off on the Plugins page takes it down, and switching it back on serves it again without a restart.
 
 ## Configure the dsh plugin
 
@@ -187,5 +189,8 @@ If a user patch still names `searchProvider: modsearch`, change or remove that o
 - `modsearch failed (exit ...)`: run `modsearch doctor`. The error includes the engine attempts made by the CLI.
 - The package appears in `plugin list` but not `--dump-config`: verify it appears in `dsh.profile.bundles` inside `~/.dsh/profiles/<name>/package.json`.
 - Electron opens another app process instead of running the CLI: use ModSearch 5.4.3 or newer. The plugin sets `ELECTRON_RUN_AS_NODE=1` for its child process.
+- `settings namespace skipped: TypeError: scope.settings.register is not a function`: ModSearch 5.10.3 or older on dsh 0.1.7 or newer. Search and both tools keep working, but the settings card is missing. Update ModSearch to 5.10.4 or newer.
+- No ModSearch settings on the plugin's page: dsh 0.1.6-alpha.2 moved plugin settings there, and ModSearch 5.10.3 or older only offers its card to the old Settings slot. Update ModSearch to 5.10.4 or newer. With `settingsCard: false` the card is off on purpose.
+- `settings card route skipped: Error: webserver: duplicate exact route "/modsearch/config"`: ModSearch 5.10.3 or older left its route behind when the plugin was switched off on the Plugins page. Restart dsh, or update ModSearch to 5.10.4 or newer.
 
 For errors emitted by the CLI itself, use [Troubleshooting](troubleshooting.md).
