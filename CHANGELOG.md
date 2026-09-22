@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.10.4 - 2026-09-23
+
+- dsh 0.1.7 no longer logs `settings namespace skipped: TypeError: scope.settings.register is not a function` (#32). That release removed the settings namespace API. The plugin now skips it where it is gone and keeps registering it for older hosts, whose Settings card still needs it. Search, `x_search`, and `read_page` were never affected.
+- The ModSearch settings card is back on dsh 0.1.6-alpha.2 and later (#32). Those releases moved plugin settings from Settings to each bundle's own page, so the card had quietly disappeared. Open **Plugins** in the sidebar and pick `@liustack/modsearch`: the form is open there straight away, and a failed load now offers a retry. Older dsh releases keep the card under Settings → Plugins → Plugin config. The values still live in `~/.modsearch/config.json`, shared by the CLI and every dsh profile on the machine, not in dsh profile config.
+- Switching the plugin off on the Plugins page now takes `/modsearch/config` down with it. Before, the route kept reading and writing the config file while the plugin was off, and switching the plugin back on logged `duplicate exact route` and skipped the new route.
+
 ## 5.10.3 - 2026-09-15
 
 - The dsh settings route no longer restricts Host, Origin, or Fetch Metadata headers, allowing domain-based reverse proxies and LAN deployments to read and save engine settings (#31). Deployment authentication must cover `/modsearch/config`, which does not automatically inherit dsh Connection authentication. Page-fetch SSRF controls remain separate.
