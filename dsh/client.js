@@ -73,6 +73,7 @@ window.__ModuleLoader__.load({
         keylessTier: 'Runs on the keyless free tier by default. Add a key to raise the quota.',
         loadFailed: 'load failed',
         saveFailed: 'save failed',
+        retry: 'Retry',
       },
       zh: {
         // 不叫「网页搜索」：dsh 自带一张「网页搜索（DeepSeek 搜索提供方）」卡片，
@@ -109,6 +110,7 @@ window.__ModuleLoader__.load({
         keylessTier: '默认使用免注册的免费额度，填入密钥可提高配额。',
         loadFailed: '加载失败',
         saveFailed: '保存失败',
+        retry: '重试',
       },
     };
 
@@ -579,16 +581,48 @@ window.__ModuleLoader__.load({
         var body = null;
         if (open) {
           if (summary === null || draft === null) {
+            // Before a summary exists, the only thing that writes a note is a
+            // load that failed. The collapsible card retries on its next
+            // expand, but the page never collapses, so a retry is offered
+            // where the failure is shown.
             body = h(
               'div',
               {
                 style: {
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
                   padding: '12px 0',
                   color: 'var(--dsw-alias-label-tertiary, rgba(127,127,127,0.8))',
                   fontSize: '13px',
                 },
               },
-              note || t.loading,
+              h('span', { role: 'status', style: { marginRight: 'auto' } }, note || t.loading),
+              note
+                ? h(
+                    'button',
+                    {
+                      type: 'button',
+                      onClick: () => {
+                        noteState[1]('');
+                        load();
+                      },
+                      style: {
+                        appearance: 'none',
+                        font: 'inherit',
+                        fontSize: '13px',
+                        lineHeight: 1.5,
+                        cursor: 'pointer',
+                        border: '1px solid var(--dsw-alias-border-l2, rgba(127,127,127,0.35))',
+                        borderRadius: '8px',
+                        padding: '5px 14px',
+                        background: 'none',
+                        color: 'var(--dsw-alias-label-secondary, inherit)',
+                      },
+                    },
+                    t.retry,
+                  )
+                : null,
             );
           } else {
             const canKey = keyed(summary, draft.engine);

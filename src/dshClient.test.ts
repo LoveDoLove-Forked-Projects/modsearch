@@ -215,7 +215,10 @@ describe('on the Plugins page the card is a section of the page, not a block of 
   // The Plugins page draws the bundle's title and description itself and
   // hands the entry `view: 'page'`. A collapsed card under that title would
   // make the user open the same thing twice.
-  function renderAs(props: Record<string, unknown>, states: unknown[]) {
+
+  // `effects: false` renders as React does after the mount effect already ran
+  // and its dependencies stayed put, which is where a failed load leaves it.
+  function renderAs(props: Record<string, unknown>, states: unknown[], effects = true) {
     const urls: string[] = [];
     const definition = evaluate({
       lang: 'en',
@@ -234,7 +237,9 @@ describe('on the Plugins page the card is a section of the page, not a block of 
       },
       useState: () => [states[index++], () => {}],
       useEffect: (fn: () => void) => {
-        fn();
+        if (effects) {
+          fn();
+        }
       },
       useCallback: (fn: unknown) => fn,
     };
@@ -268,6 +273,26 @@ describe('on the Plugins page the card is a section of the page, not a block of 
     const { out, urls } = renderAs({ view: 'summary' }, [false, null, null, '']);
     expect(out).toBe('Search engine provider configuration.');
     expect(urls).toEqual([]);
+  });
+
+  it('offers a retry after a failed load, since the page never collapses to retry', () => {
+    // The collapsible card retried on the next expand. On the page the form
+    // is always open, so the load effect never fires again on its own.
+    const failed = renderAs({ view: 'page' }, [false, null, null, 'load failed'], false);
+    expect(failed.urls).toEqual([]);
+    const retry = failed.nodes.find(
+      (node) => node.type === 'button' && node.kids.includes('Retry'),
+    );
+    if (!retry) {
+      throw new Error('no retry button');
+    }
+    (retry.props.onClick as () => void)();
+    expect(failed.urls).toEqual(['/modsearch/config?doctor=1']);
+  });
+
+  it('shows no retry while the first load is still on its way', () => {
+    const { nodes } = renderAs({ view: 'page' }, [false, null, null, '']);
+    expect(nodes.some((node) => node.type === 'button' && node.kids.includes('Retry'))).toBe(false);
   });
 
   it('keeps the collapsible card where the host passes no view', () => {
