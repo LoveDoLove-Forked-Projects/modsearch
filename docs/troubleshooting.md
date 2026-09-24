@@ -47,6 +47,24 @@ agy's free tier is one weekly grant shared by the Antigravity desktop app, the C
 - Add a keyed search engine (Tavily, Exa, or Firecrawl). Search then falls through to it automatically, with no further action from you.
 - With cooldown on (the default), agy is remembered as spent and moved to the back of the chain until it resets, so later runs fail over first. See "An engine keeps getting skipped" below.
 
+## agy not available in your location
+
+```
+Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location.
+```
+
+Antigravity is not offered in your region, so agy refuses every call, signed in or not. Another search engine picks up the work on its own. With cooldown on (the default), agy is held at the back of the chain for a day, so later runs stop starting it first. If agy will never work on this machine, take it out of the automatic chain for good:
+
+```bash
+modsearch config set antigravity-cli.enabled false
+```
+
+## A console window flashes on Windows
+
+A black console window can pop up and grab focus while the `antigravity-cli` engine runs, most often right after agy updates itself. modsearch starts agy with its console hidden, and that part stays hidden. The window belongs to a helper process agy starts on its own while it finishes a self-update. That helper opens a fresh console of its own, which no setting on modsearch's side can reach. It happens most often under GUI hosts that have no console of their own, such as DSH Desktop.
+
+The window closes by itself and does not affect results. To avoid it, move agy off the automatic chain as above. An explicit `-e antigravity-cli` still runs it when you want it.
+
 ## Exa or Firecrawl authentication rejected
 
 ```
@@ -76,7 +94,7 @@ Tavily returns 432 (plan usage cap) and 433 (PAYGO cap) when the monthly budget 
 
 ## An engine keeps getting skipped
 
-modsearch is failing over around a cooldown. When an engine hit a quota wall, it is remembered in `~/.modsearch/state.json` and tried last until it recovers, and the result's `warnings` name which engine and until when. Run `modsearch doctor` to see what is cooling and how much time is left. To clear it by hand:
+modsearch is failing over around a cooldown. When an engine hit a quota wall or a region lock, it is remembered in `~/.modsearch/state.json` and tried last until it recovers, and the result's `warnings` name which engine and until when. Run `modsearch doctor` to see what is cooling and how much time is left. To clear it by hand:
 
 ```bash
 modsearch state clear

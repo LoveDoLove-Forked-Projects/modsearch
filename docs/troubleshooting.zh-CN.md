@@ -47,6 +47,24 @@ agy 的免费额度是 Antigravity 桌面应用、CLI、SDK 共享的每周配�
 - 加一个带 key 的搜索引擎（Tavily、Exa 或 Firecrawl）。之后搜索自动落到它，你不用再做任何事。
 - 冷却开着时（默认），agy 会被记为耗尽并挪到链末尾直到重置，后续运行先走别家。见下文「某个引擎总被跳过」。
 
+## agy 在你所在地区不可用
+
+```
+Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location.
+```
+
+Antigravity 没有在你所在的地区开放，所以不管登没登录，agy 每次调用都会拒绝。其他搜索引擎会自动接手。冷却开着时（默认），agy 会被按在链末尾一整天，后续运行不再先启动它。如果这台机器上 agy 永远用不了，就把它彻底移出自动链：
+
+```bash
+modsearch config set antigravity-cli.enabled false
+```
+
+## Windows 上闪出控制台窗口
+
+`antigravity-cli` 引擎运行时，可能会弹出一个黑色控制台窗口并抢走焦点，多半发生在 agy 刚自我更新之后。modsearch 启动 agy 时隐藏了它的控制台，这一层确实一直隐藏着。窗口来自 agy 在自我更新收尾时自己启动的助手进程。这个助手进程会新开一个属于自己的控制台，modsearch 这边的任何设置都够不到它。在自身没有控制台的图形界面宿主（比如 DSH Desktop）下最常见。
+
+窗口会自己关掉，不影响结果。想避开它，按上面的方法把 agy 移出自动链。需要时用 `-e antigravity-cli` 显式指定仍能调用它。
+
 ## Exa 或 Firecrawl 鉴权被拒
 
 ```
@@ -76,7 +94,7 @@ tavily is out of monthly quota (HTTP 432). ...
 
 ## 某个引擎总被跳过
 
-modsearch 在绕开一个冷却。引擎撞过额度墙后会被记在 `~/.modsearch/state.json` 里，恢复前总是最后一试，结果的 `warnings` 会写明是哪个引擎、冷却到什么时候。跑 `modsearch doctor` 看谁在冷却、还剩多久。手动清除：
+modsearch 在绕开一个冷却。引擎撞过额度墙或地区限制后会被记在 `~/.modsearch/state.json` 里，恢复前总是最后一试，结果的 `warnings` 会写明是哪个引擎、冷却到什么时候。跑 `modsearch doctor` 看谁在冷却、还剩多久。手动清除：
 
 ```bash
 modsearch state clear

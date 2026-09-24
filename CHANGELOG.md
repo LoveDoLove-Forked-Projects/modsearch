@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- When agy reports that Antigravity is not available in your location, modsearch now holds it at the back of the chain for a day, the same as a spent monthly quota (#33). Before, every run started agy first and waited for it to fail, and on Windows agy's own self-update helper could flash a console window each time. The troubleshooting page now covers the region message and the console flash, which comes from agy's helper process rather than from modsearch, and how to take agy off the automatic chain with `modsearch config set antigravity-cli.enabled false`.
+
 ## 5.10.4 - 2026-09-23
 
 - dsh 0.1.7 no longer logs `settings namespace skipped: TypeError: scope.settings.register is not a function` (#32). That release removed the settings namespace API. The plugin now skips it where it is gone and keeps registering it for older hosts, whose Settings card still needs it. Search, `x_search`, and `read_page` were never affected.
