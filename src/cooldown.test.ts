@@ -176,6 +176,16 @@ describe('classifyQuota', () => {
     expect((until as Date).getTime() - now.getTime()).toBe(MONTHLY_COOLDOWN_MS);
   });
 
+  it('holds an agy region lock for 24 hours (#33)', () => {
+    const until = classifyQuota(
+      new Error(
+        'antigravity-cli engine failed with code 1. stderr: error: Eligibility check failed: Your current account is not eligible for Antigravity, because it is not currently available in your location.',
+      ),
+      now,
+    );
+    expect((until as Date).getTime() - now.getTime()).toBe(MONTHLY_COOLDOWN_MS);
+  });
+
   it('does not persist a per-second rate limit', () => {
     expect(
       classifyQuota(new Error('tavily returned 429 Too Many Requests: rate limit'), now),

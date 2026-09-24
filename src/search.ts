@@ -344,14 +344,14 @@ async function runOneSource(
           error: message,
           durationSeconds: (Date.now() - startedAt) / 1000,
         });
-        // A quota-class failure is remembered so a later run fails over first. A
-        // transient failure (rate limit, timeout) records nothing.
+        // A lasting failure (quota, region lock) is remembered so a later run
+        // fails over first. A transient one (rate limit, timeout) records nothing.
         if (controller) {
           const entry = controller.record(engine.name, error, keyRun.keyIndex);
           if (entry) {
             const keyNote = keyRun.keyIndex === undefined ? '' : ` API key ${keyRun.keyIndex + 1}`;
             cooldownNotes.push(
-              `The ${engine.name} engine${keyNote} hit its quota and is now cooling until ${entry.until}.`,
+              `The ${engine.name} engine${keyNote} hit a lasting limit (quota or region) and is now cooling until ${entry.until}.`,
             );
           }
         }

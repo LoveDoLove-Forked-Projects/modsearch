@@ -63,6 +63,15 @@ export const DEFAULT_COOLDOWN_MS = 45 * 60 * 1000;
  */
 export const MONTHLY_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * agy refuses accounts in regions where Antigravity is not offered. That wall
+ * does not lift within the hour either, and every retry still starts agy (on
+ * Windows its own helpers can flash a console window, #33), so it cools for a
+ * day like a spent monthly budget.
+ */
+const REGION_LOCKED =
+  /eligibility check failed|not (?:currently )?available in your (?:location|region|country)/i;
+
 export function emptyCooldownState(): CooldownState {
   return { engineCooldowns: {} };
 }
@@ -236,10 +245,14 @@ export function parseResetDuration(message: string): number | null {
  * when the engine should recover. A per-second rate limit is transient, not a
  * spent budget, so it returns null and never touches the store. A quota error
  * with a reset clause recovers precisely, one without recovers after the
- * default TTL.
+ * default TTL. A region lock is not a quota but is just as lasting, so it is
+ * held for a day.
  */
 export function classifyQuota(error: unknown, now: Date): Date | null {
   const message = error instanceof Error ? error.message : String(error);
+  if (REGION_LOCKED.test(message)) {
+    return new Date(now.getTime() + MONTHLY_COOLDOWN_MS);
+  }
   const looksRateLimited = /rate.?limit|too many requests|\b429\b/i.test(message);
   // Tavily's monthly plan cap (432) and PAYGO cap (433) are a spent monthly
   // budget carried in the status code, not a per-second blip.
