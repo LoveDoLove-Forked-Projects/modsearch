@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 5.10.5 - 2026-09-24
 
 - When agy reports that Antigravity is not available in your location, modsearch now holds it at the back of the chain for a day, the same as a spent monthly quota (#33). Before, every run started agy first and waited for it to fail, and on Windows agy's own self-update helper could flash a console window each time. The troubleshooting page now covers the region message and the console flash, which comes from agy's helper process rather than from modsearch, and how to take agy off the automatic chain with `modsearch config set antigravity-cli.enabled false`.
 
