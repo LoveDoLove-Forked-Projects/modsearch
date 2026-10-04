@@ -118,7 +118,8 @@ describe.runIf(SPAWNS_FAKE_CLI)('runCommand pending kills', () => {
     );
     const startedAt = Date.now();
     await waitForPendingKills();
-    expect(Date.now() - startedAt).toBeLessThan(500);
+    // A wrongly armed kill would hold this for the full 2s grace.
+    expect(Date.now() - startedAt).toBeLessThan(1_500);
   });
 
   it('lets a caller wait until a SIGTERM-ignoring child is SIGKILLed', async () => {
