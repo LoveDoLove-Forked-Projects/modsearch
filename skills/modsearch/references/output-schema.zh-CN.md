@@ -79,7 +79,7 @@ CLI 向 stdout 打印一个 JSON 对象。顶层信封对每次运行都一样�
 
 - `ok`：请求的语料作了答。`source` 等于 `requestedSource`。
 - `degraded`：替补语料作了答。目前只有 X 会降级：Grok Build 缺失、未登录或故障时，由网页引擎回答 X 请求。此时条目是 `requestedSource: "x"`、`source: "web"`、`status: "degraded"`，`warnings` 解释网页数据看不到 X 内部。不要把降级条目当成 X 的覆盖来呈现。
-- `unavailable`：没有任何东西能服务这个语料。`engine` 为 `null`，`items` 为空，`attempts` 列出试过且失败的引擎（一个都没能启动时为空），`durationSeconds` 为 `null`，`warnings` 说明原因。`--source web,x` 运行中 X 不可达时，X 槽位就是这样显式存在，而不是无声消失：
+- `unavailable`：没有任何东西能服务这个语料。`engine` 为 `null`，`items` 为空，`attempts` 列出试过或被跳过的每个引擎（路由一个可试的引擎都没找到时为空），`durationSeconds` 为 `null`，`warnings` 说明原因。`--source web,x` 运行中 X 不可达时，X 槽位就是这样显式存在，而不是无声消失：
 
 ```json
 {

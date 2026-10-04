@@ -101,8 +101,8 @@ for:
   and `warnings` explains that web data cannot see inside X. Do not present a
   degraded entry as X coverage.
 - `unavailable`: nothing could serve the source. `engine` is `null`, `items` is
-  empty, `attempts` lists the engines that were tried and failed (empty when
-  none could start), `durationSeconds` is `null`, and `warnings` says why. This appears for the X slot of a `--source web,x` run when X is
+  empty, `attempts` lists every engine that was tried or skipped (empty when
+  routing found no engine to try), `durationSeconds` is `null`, and `warnings` says why. This appears for the X slot of a `--source web,x` run when X is
   unreachable, so the slot is explicit rather than silently missing:
 
 ```json
