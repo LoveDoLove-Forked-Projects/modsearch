@@ -123,7 +123,8 @@ Tavily、Exa、Firecrawl 的官方接口地址内置在 provider 代码里。界
     xSearch: true
     readPage: true
     settingsCard: true
-    providerTimeoutMs: 55000
+    providerTimeoutMs: 40000
+    providerDeadlineMs: 55000
 ```
 
 所有字段都可省略：
@@ -134,7 +135,8 @@ Tavily、Exa、Firecrawl 的官方接口地址内置在 provider 代码里。界
 | `xSearch` | `true` | 注册 `x_search`。 |
 | `readPage` | `true` | 注册 `read_page`。 |
 | `settingsCard` | `true` | 提供设置卡片与 `/modsearch/config` 路由。关掉后两者都不注册，浏览器那半边也随之停手。 |
-| `providerTimeoutMs` | `55000` | `web_search` provider 路径交给 CLI 的截止时间。应小于 dsh 的工具预算。 |
+| `providerTimeoutMs` | `40000` | `web_search` provider 路径上单个引擎最多用多久（即 CLI 的 `--timeout`）。要明显小于 `providerDeadlineMs`，备用引擎才轮得到。 |
+| `providerDeadlineMs` | `55000` | `web_search` 整次运行最多用多久，所有引擎合计（即 CLI 的 `--deadline`）。应小于 dsh 的工具预算，自带搜索路由是 60 秒。 |
 
 只关闭 `x_search` 或 `read_page` 不会影响别的能力。关闭 `searchProvider` 时还要把 web 接缝指向另一个已注册 provider。否则 dsh 仍被配置成选择 `modsearch`，但对应 provider 已不存在：
 

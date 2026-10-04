@@ -211,6 +211,63 @@ describe('dsh web search provider', () => {
   });
 });
 
+/** A fake CLI that answers with its own argv as the summary. */
+function argvEchoCli(): void {
+  fakeCli(`
+    const entry = ${JSON.stringify(okSearchEntry)};
+    entry.summary = JSON.stringify(process.argv.slice(2));
+    entry.content = '';
+    console.log(JSON.stringify({ results: [entry] }));
+  `);
+}
+
+/** The value following a flag in an echoed argv. */
+function flag(argv: string[], name: string): string | undefined {
+  const index = argv.indexOf(name);
+  return index === -1 ? undefined : argv[index + 1];
+}
+
+describe('dsh CLI budgets', () => {
+  it("keeps the provider path inside tool-web's 60s budget with room to fail over", async () => {
+    argvEchoCli();
+    const { providers } = await load();
+    const result = await providers[0].search({ query: 'anything' });
+    const argv = JSON.parse(result.content.split('\n')[0]) as string[];
+    // One engine may take 40s, the whole chain 55s: a failover engine still
+    // answers, and a terminal state always lands before the host aborts.
+    expect(flag(argv, '--timeout')).toBe('40000');
+    expect(flag(argv, '--deadline')).toBe('55000');
+  });
+
+  it('lets the plugin config move both provider budgets', async () => {
+    argvEchoCli();
+    const { providers } = await load({ providerTimeoutMs: 30_000, providerDeadlineMs: 50_000 });
+    const result = await providers[0].search({ query: 'anything' });
+    const argv = JSON.parse(result.content.split('\n')[0]) as string[];
+    expect(flag(argv, '--timeout')).toBe('30000');
+    expect(flag(argv, '--deadline')).toBe('50000');
+  });
+
+  it('bounds x_search and read_page by a run deadline inside their own backstop', async () => {
+    argvEchoCli();
+    const { tools } = await load();
+    for (const [name, args] of [
+      ['x_search', { query: 'anything' }],
+      ['read_page', { url: 'https://a.example' }],
+    ] as const) {
+      const tool = toolNamed(tools, name) as RegisteredTool & { timeoutMs: number };
+      const value = await tool.execute(args, {});
+      const argv = JSON.parse(String(value.summary)) as string[];
+      const engineTimeout = Number(flag(argv, '--timeout'));
+      const deadline = Number(flag(argv, '--deadline'));
+      // A slow first engine leaves time for the next, and the whole run ends
+      // before the harness backstop fires its bare abort.
+      expect(engineTimeout).toBeLessThan(deadline);
+      expect(deadline).toBeLessThan(tool.timeoutMs);
+    }
+  });
+});
+
 describe('dsh x_search tool', () => {
   it('returns evidence plus provenance as the canonical value', async () => {
     const { tools } = await load();

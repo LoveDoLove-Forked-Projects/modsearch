@@ -123,7 +123,8 @@ Plugin switches live in the profile patch, normally `~/.dsh/profiles/<name>/cord
     xSearch: true
     readPage: true
     settingsCard: true
-    providerTimeoutMs: 55000
+    providerTimeoutMs: 40000
+    providerDeadlineMs: 55000
 ```
 
 All fields are optional:
@@ -134,7 +135,8 @@ All fields are optional:
 | `xSearch` | `true` | Register `x_search`. |
 | `readPage` | `true` | Register `read_page`. |
 | `settingsCard` | `true` | Serve the settings card and its `/modsearch/config` route. Off removes both, and the browser half stands down. |
-| `providerTimeoutMs` | `55000` | Deadline passed to the CLI for the `web_search` provider path. Keep it below dsh's tool budget. |
+| `providerTimeoutMs` | `40000` | Time one engine may take on the `web_search` provider path (the CLI's `--timeout`). Keep it well below `providerDeadlineMs` so a fallback engine still gets a turn. |
+| `providerDeadlineMs` | `55000` | Time the whole `web_search` run may take, every engine included (the CLI's `--deadline`). Keep it below dsh's tool budget, 60s for the shipped search route. |
 
 Disabling only `x_search` or `read_page` is safe. If `searchProvider` is disabled, also point the web seam at another registered provider. Otherwise dsh is still configured to select `modsearch`, but the provider is absent:
 

@@ -38,12 +38,22 @@ const FETCH_OUTPUT_SCHEMA = JSON.parse(
   readFileSync(new URL('./fetch-schema.json', import.meta.url), 'utf8'),
 );
 
-// Own tools get the CLI's full default budget plus a cooperative backstop.
-const CLI_TIMEOUT_MS = 180_000;
+// The CLI's --timeout is per engine, and a failed engine hands over to the
+// next with a fresh budget, so each path also passes --deadline: the whole
+// run's wall clock. The per-engine share stays well under the deadline so a
+// failover engine still gets its turn, and the deadline stays under the
+// harness budget so the run always ends in a result or the CLI's descriptive
+// error, never the host's bare abort.
+//
+// Own tools: up to 120s per engine, 180s for the run, plus a cooperative
+// backstop past the deadline.
+const OWN_TOOL_ENGINE_TIMEOUT_MS = 120_000;
+const OWN_TOOL_DEADLINE_MS = 180_000;
+const OWN_TOOL_BACKSTOP_MS = OWN_TOOL_DEADLINE_MS + 20_000;
 // The provider path runs under tool-web's budget (60s for the shipped search
-// route), so its CLI deadline stays just below it: the engine's own timeout
-// fires first and produces a descriptive error instead of a bare abort.
-const PROVIDER_TIMEOUT_MS = 55_000;
+// route): 40s for one engine leaves a fast fallback room inside a 55s run.
+const PROVIDER_TIMEOUT_MS = 40_000;
+const PROVIDER_DEADLINE_MS = 55_000;
 
 export const name = 'modsearch';
 export const inject = ['tools', 'web'];
@@ -129,11 +139,21 @@ function registerSearchProvider(ctx, config) {
     return;
   }
   const timeoutMs = config.providerTimeoutMs ?? PROVIDER_TIMEOUT_MS;
+  const deadlineMs = config.providerDeadlineMs ?? PROVIDER_DEADLINE_MS;
   ctx.web.registerSearchProvider({
     id: 'modsearch',
     available: () => true,
     async search(request, signal) {
-      const args = ['-q', request.query, '--source', 'web', '--timeout', String(timeoutMs)];
+      const args = [
+        '-q',
+        request.query,
+        '--source',
+        'web',
+        '--timeout',
+        String(timeoutMs),
+        '--deadline',
+        String(deadlineMs),
+      ];
       if (typeof request.maxResults === 'number') {
         args.push('--max-results', String(request.maxResults));
       }
@@ -186,7 +206,7 @@ function registerXSearchTool(ctx) {
       presentationMeta: (_args, value) => ({ sources: toSources(value.items) }),
     },
     // The CLI enforces its own deadline; this is the cooperative backstop.
-    timeoutMs: CLI_TIMEOUT_MS + 20_000,
+    timeoutMs: OWN_TOOL_BACKSTOP_MS,
     isConcurrencySafe: () => true,
     presentCall: (args) => ({
       card: 'generic',
@@ -204,7 +224,7 @@ function registerXSearchTool(ctx) {
       if (typeof args?.query !== 'string' || args.query.trim() === '') {
         throw new Error('x_search needs a non-empty string "query".');
       }
-      const cliArgs = ['-q', args.query, '--source', 'x', '--timeout', String(CLI_TIMEOUT_MS)];
+      const cliArgs = ['-q', args.query, '--source', 'x', ...ownToolBudget()];
       if (typeof args.max_results === 'number' && args.max_results > 0) {
         cliArgs.push('--max-results', String(Math.floor(args.max_results)));
       }
@@ -255,7 +275,7 @@ function registerReadPageTool(ctx) {
       schema: FETCH_OUTPUT_SCHEMA,
       render: (_args, value) => [{ type: 'text', text: renderFetchEvidence(value) }],
     },
-    timeoutMs: CLI_TIMEOUT_MS + 20_000,
+    timeoutMs: OWN_TOOL_BACKSTOP_MS,
     isConcurrencySafe: () => true,
     presentCall: (args) => ({
       card: 'generic',
@@ -267,7 +287,7 @@ function registerReadPageTool(ctx) {
       if (typeof args?.url !== 'string' || !/^https?:\/\//i.test(args.url.trim())) {
         throw new Error('read_page needs an http(s) "url".');
       }
-      const cliArgs = ['-u', args.url, '--timeout', String(CLI_TIMEOUT_MS)];
+      const cliArgs = ['-u', args.url, ...ownToolBudget()];
       if (typeof args.query === 'string' && args.query.trim() !== '') {
         cliArgs.push('-q', args.query);
       }
@@ -281,6 +301,16 @@ function registerReadPageTool(ctx) {
       };
     },
   });
+}
+
+/** The CLI budget flags for the plugin's own tools. */
+function ownToolBudget() {
+  return [
+    '--timeout',
+    String(OWN_TOOL_ENGINE_TIMEOUT_MS),
+    '--deadline',
+    String(OWN_TOOL_DEADLINE_MS),
+  ];
 }
 
 /**
