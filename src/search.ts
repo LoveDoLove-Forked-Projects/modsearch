@@ -507,7 +507,9 @@ function attemptBudget(
   if (!deadline) {
     return { engineTimeoutMs: timeoutMs, killAfterMs: timeoutMs + KILL_GRACE_MS };
   }
-  const remaining = deadline.at - Date.now();
+  // Whole milliseconds: the start clock may carry fractions, and engines hand
+  // this to AbortSignal.timeout, which rejects a fractional delay.
+  const remaining = Math.floor(deadline.at - Date.now());
   if (remaining <= 0) {
     return null;
   }

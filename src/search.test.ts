@@ -600,13 +600,15 @@ describeSpawn('a run deadline bounds the whole chain', () => {
       config,
       env: BARE_ENV,
       timeoutMs: 20_000,
-      deadlineMs: 3_000,
+      // Wide enough that a slow spawn of the failing agy still leaves firecrawl
+      // a turn, short enough that 20s would plainly show the cap missing.
+      deadlineMs: 6_000,
     });
 
     const firecrawl = error.attempts.find((attempt) => attempt.engine === 'firecrawl');
     const capped = Number(/timed out after (\d+) ms/.exec(firecrawl?.error ?? '')?.[1]);
     expect(capped).toBeGreaterThan(0);
-    expect(capped).toBeLessThanOrEqual(3_000);
+    expect(capped).toBeLessThanOrEqual(6_000);
   }, 20_000);
 
   it('leaves the fallback room when a subprocess engine ignores its own timeout', async () => {
@@ -658,6 +660,31 @@ describeSpawn('a run deadline bounds the whole chain', () => {
 describe('a run deadline holds over an in-process engine that overruns', () => {
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it('hands engines a whole-millisecond budget from a fractional clock', async () => {
+    // performance.timeOrigin carries fractions, and AbortSignal.timeout throws
+    // ERR_OUT_OF_RANGE on a fractional delay, so the budget must be whole.
+    const firecrawl = findEngine('firecrawl') as Required<SearchEngine>;
+    const seen: number[] = [];
+    vi.spyOn(firecrawl, 'execute').mockImplementation(async (request) => {
+      seen.push(request.timeoutMs);
+      return {
+        result: { summary: 's', items: [], uncertainty: [] },
+        meta: { conversationId: null, durationSeconds: 0, usage: null },
+      };
+    });
+    await runSearch({
+      query: 'anything',
+      engine: 'firecrawl',
+      config: {},
+      env: BARE_ENV,
+      timeoutMs: 20_000,
+      deadlineMs: 5_000,
+      deadlineStartedAt: Date.now() + 0.375,
+    });
+    expect(seen).toHaveLength(1);
+    expect(Number.isInteger(seen[0])).toBe(true);
   });
 
   it('stops waiting on the engine when the deadline falls', async () => {
