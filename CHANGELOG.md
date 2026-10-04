@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.10.6 - 2026-10-04
+
+- dsh's `web_search` no longer dies with `tool call timed out after 60000ms` when the first engine is slow (#35). `--timeout` limits each engine, and every fallback engine used to start with a fresh budget, so a slow first engine could use up the host's whole 60 seconds before the fallback answered. The new `--deadline <ms>` limits the whole run: each engine gets the smaller of `--timeout` and the time left, and an engine whose turn comes after the deadline is skipped and listed in `attempts`. The dsh plugin now passes 40 seconds per engine and a 55 second deadline for `web_search` (configurable as `providerTimeoutMs` and `providerDeadlineMs`), and 120 and 180 seconds for `x_search` and `read_page`.
+- Engine timeouts now cover the whole request. Tavily, Exa, and Firecrawl stopped timing once the response headers arrived, so a slowly streamed body could run past the timeout. Firecrawl's DNS check before a page fetch, and the local fetcher's DNS lookup, now give up when the timeout fires.
+- An engine that ignores its own timeout is now stopped as well. A command-line engine (agy, Grok Build) is killed 5 seconds past its timeout under a deadline, and 30 seconds past it without one, as before. An in-process engine is abandoned at the same point.
+- The CLI now exits once its result is written, after making sure any engine that ignored SIGTERM has been sent SIGKILL. Before, a run could leave such an engine running, or wait on leftover work after printing its result.
+
 ## 5.10.5 - 2026-09-24
 
 - When agy reports that Antigravity is not available in your location, modsearch now holds it at the back of the chain for a day, the same as a spent monthly quota (#33). Before, every run started agy first and waited for it to fail, and on Windows agy's own self-update helper could flash a console window each time. The troubleshooting page now covers the region message and the console flash, which comes from agy's helper process rather than from modsearch, and how to take agy off the automatic chain with `modsearch config set antigravity-cli.enabled false`.
