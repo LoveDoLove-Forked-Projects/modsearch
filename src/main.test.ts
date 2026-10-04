@@ -88,13 +88,14 @@ describe('search flags', () => {
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
     await import('./main.ts');
     await vi.waitFor(() => {
-      expect(runSearch.mock.calls.length + exit.mock.calls.length).toBeGreaterThan(0);
+      expect(runSearch.mock.calls.length + stderr.mock.calls.length).toBeGreaterThan(0);
     });
     return { runSearch, stderr, exit };
   }
 
   afterEach(() => {
     vi.doUnmock('./search.ts');
+    process.exitCode = undefined;
   });
 
   it('passes --deadline through as the run-wide budget', async () => {
@@ -106,8 +107,14 @@ describe('search flags', () => {
       '--deadline',
       '55000',
     ]);
+    // The clock starts at process start: a slow Node boot spends the same
+    // budget the caller is holding.
     expect(runSearch).toHaveBeenCalledWith(
-      expect.objectContaining({ timeoutMs: 40_000, deadlineMs: 55_000 }),
+      expect.objectContaining({
+        timeoutMs: 40_000,
+        deadlineMs: 55_000,
+        deadlineStartedAt: performance.timeOrigin,
+      }),
     );
   });
 
@@ -118,7 +125,11 @@ describe('search flags', () => {
 
   it('rejects a --deadline that is not a positive integer', async () => {
     const { runSearch, stderr, exit } = await runCli(['-q', 'anything', '--deadline', '0']);
-    expect(exit).toHaveBeenCalledWith(1);
+    // A failed run sets the exit code and lets the event loop drain rather
+    // than exiting on the spot, which would cancel a pending SIGKILL for an
+    // engine that ignored SIGTERM.
+    expect(process.exitCode).toBe(1);
+    expect(exit).not.toHaveBeenCalled();
     expect(runSearch).not.toHaveBeenCalled();
     expect(String(stderr.mock.calls.map((call) => call[0]).join(''))).toContain(
       'Invalid --deadline',

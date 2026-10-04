@@ -31,6 +31,12 @@ export interface RunSearchOptions {
    * so a chain of N engines may take up to N times `timeoutMs`.
    */
   deadlineMs?: number;
+  /**
+   * Epoch milliseconds the deadline counts from. Defaults to the start of this
+   * run. The CLI passes its process start, so Node startup and config loading
+   * come out of the same budget the caller is holding.
+   */
+  deadlineStartedAt?: number;
   maxResults?: number;
   workdir?: string;
   /** One-off override for the local engine's private network guard. */
@@ -126,6 +132,9 @@ export interface RunSearchResult {
 const DEFAULT_TIMEOUT_MS = 180_000;
 // Give the engine's own timeout a chance to fire first; SIGTERM is the backstop.
 const KILL_GRACE_MS = 30_000;
+// Under a run deadline the grace is short, so an engine that ignores its own
+// timeout cannot spend the time a fallback engine was meant to have.
+const DEADLINE_KILL_GRACE_MS = 5_000;
 
 /**
  * A source ran out of engines. Carries the per-engine attempts so a multi-source
@@ -203,7 +212,10 @@ export async function runSearch(options: RunSearchOptions): Promise<RunSearchRes
   const deadline =
     options.deadlineMs === undefined
       ? undefined
-      : { at: startedAt + options.deadlineMs, ms: options.deadlineMs };
+      : {
+          at: (options.deadlineStartedAt ?? startedAt) + options.deadlineMs,
+          ms: options.deadlineMs,
+        };
   const context = { mode, query, url, timeoutMs, deadline, config, env, options };
 
   // Run every source's plan concurrently and reassemble in request order, so a
@@ -483,9 +495,10 @@ interface RunDeadline {
 }
 
 /**
- * The time one attempt may take: the engine's own timeout, and the moment a
- * subprocess engine is killed if it ignores that timeout. Both are capped by
- * what the run deadline has left. Null when the deadline is already spent.
+ * The time one attempt may take: the engine's own timeout, and the moment the
+ * run stops waiting on an engine that ignores it (a subprocess is killed then).
+ * Both are capped by what the run deadline has left. Null when the deadline is
+ * already spent.
  */
 function attemptBudget(
   timeoutMs: number,
@@ -500,7 +513,7 @@ function attemptBudget(
   }
   return {
     engineTimeoutMs: Math.min(timeoutMs, remaining),
-    killAfterMs: Math.min(timeoutMs + KILL_GRACE_MS, remaining),
+    killAfterMs: Math.min(timeoutMs + DEADLINE_KILL_GRACE_MS, remaining),
   };
 }
 
@@ -510,7 +523,7 @@ async function callEngine(
   killAfterMs: number,
 ): Promise<EngineOutput> {
   if (engine.execute) {
-    return engine.execute(request);
+    return withinTime(engine.name, engine.execute(request), killAfterMs);
   }
   if (engine.buildInvocation && engine.parseOutput) {
     const invocation = engine.buildInvocation(request);
@@ -523,6 +536,26 @@ async function callEngine(
     return engine.parseOutput(commandResult.stdout);
   }
   throw new Error(`Engine ${engine.name} implements neither execute nor buildInvocation.`);
+}
+
+/**
+ * Stop waiting on an in-process engine that overran its own timeout. Engines
+ * cancel their own requests on time, so this only fires on an engine bug, and
+ * it keeps that bug from holding the run past its deadline.
+ */
+async function withinTime<T>(engineName: string, work: Promise<T>, ms: number): Promise<T> {
+  let timer: NodeJS.Timeout | undefined;
+  const overrun = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${engineName} engine timed out after ${ms} ms.`)),
+      ms,
+    );
+  });
+  try {
+    return await Promise.race([work, overrun]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

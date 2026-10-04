@@ -228,13 +228,14 @@ function flag(argv: string[], name: string): string | undefined {
 }
 
 describe('dsh CLI budgets', () => {
-  it("keeps the provider path inside tool-web's 60s budget with room to fail over", async () => {
+  it('passes 40s per engine and a 55s run deadline on the provider path', async () => {
     argvEchoCli();
     const { providers } = await load();
     const result = await providers[0].search({ query: 'anything' });
     const argv = JSON.parse(result.content.split('\n')[0]) as string[];
-    // One engine may take 40s, the whole chain 55s: a failover engine still
-    // answers, and a terminal state always lands before the host aborts.
+    // One engine may take 40s, the whole chain 55s. Even an engine that
+    // ignores its own timeout is stopped 5s past it, which leaves a fast
+    // fallback 10s, and the run ends before the host's 60s abort.
     expect(flag(argv, '--timeout')).toBe('40000');
     expect(flag(argv, '--deadline')).toBe('55000');
   });

@@ -59,7 +59,7 @@ CLI 向 stdout 打印一个 JSON 对象。顶层信封对每次运行都一样�
 | `model` | 使用的模型，引擎有模型时才有值（没有时是空字符串） |
 | `status` | `ok`、`degraded` 或 `unavailable`（见下文） |
 | `warnings` | 这个语料的路由与运行警告：一次回退、一条降级说明、一个配置笔误、本地引擎的「无综述」和「已放行私有网络」提示。说的是答案怎么产生的，不是答案里的事实。永远是数组，常为空 |
-| `attempts` | 这个语料按顺序发出的每次请求：`{ engine, keyIndex?, ok, error?, durationSeconds, cost?, credits? }`。同一引擎配置多个 key 时会带零基的 `keyIndex`。单 key 和免 key 请求维持原有结构，不出现该字段。`ok: false` 的条目带失败 `error`。会上报消耗的引擎会附 `cost`（exa，美元）或 `credits`（firecrawl）。两个字段都可选，不上报的引擎上没有。成功的运行末尾恰有一条 `ok: true` |
+| `attempts` | 这个语料按顺序发出的每次请求：`{ engine, keyIndex?, ok, error?, durationSeconds, cost?, credits? }`。同一引擎配置多个 key 时会带零基的 `keyIndex`。单 key 和免 key 请求维持原有结构，不出现该字段。`ok: false` 的条目带失败 `error`。会上报消耗的引擎会附 `cost`（exa，美元）或 `credits`（firecrawl）。两个字段都可选，不上报的引擎上没有。因运行的 `--deadline` 已用完而被跳过的引擎记为 `ok: false`，`error` 写明原因，`durationSeconds` 为 `null`。成功的运行末尾恰有一条 `ok: true` |
 | `durationSeconds` | 这一个语料花了多久，什么都没跑时为 `null` |
 
 其余字段取决于模式。
@@ -79,7 +79,7 @@ CLI 向 stdout 打印一个 JSON 对象。顶层信封对每次运行都一样�
 
 - `ok`：请求的语料作了答。`source` 等于 `requestedSource`。
 - `degraded`：替补语料作了答。目前只有 X 会降级：Grok Build 缺失、未登录或故障时，由网页引擎回答 X 请求。此时条目是 `requestedSource: "x"`、`source: "web"`、`status: "degraded"`，`warnings` 解释网页数据看不到 X 内部。不要把降级条目当成 X 的覆盖来呈现。
-- `unavailable`：没有任何东西能服务这个语料。`engine` 为 `null`，`items` 为空，`attempts` 为空，`durationSeconds` 为 `null`，`warnings` 说明原因。`--source web,x` 运行中 X 不可达时，X 槽位就是这样显式存在，而不是无声消失：
+- `unavailable`：没有任何东西能服务这个语料。`engine` 为 `null`，`items` 为空，`attempts` 列出试过且失败的引擎（一个都没能启动时为空），`durationSeconds` 为 `null`，`warnings` 说明原因。`--source web,x` 运行中 X 不可达时，X 槽位就是这样显式存在，而不是无声消失：
 
 ```json
 {

@@ -66,7 +66,7 @@ result fields in beside them:
 | `model` | the model used, where the engine has one (empty string when it does not) |
 | `status` | `ok`, `degraded`, or `unavailable` (see below) |
 | `warnings` | routing and runtime warnings for this source: a fallback, a degrade caveat, a config typo, the local engine's "no synthesis" and "private network allowed" notices. About how the answer was produced, not the facts in it. Always an array, often empty |
-| `attempts` | every request attempt for this source, in order: `{ engine, keyIndex?, ok, error?, durationSeconds, cost?, credits? }`. `keyIndex` is a zero-based index present only when that engine has multiple configured keys. Single-key and keyless attempts keep the previous shape without it. `ok: false` entries carry the failure `error`. An engine that reports spend adds `cost` (exa, US dollars) or `credits` (firecrawl). Both are optional and absent on engines that report neither. One `ok: true` entry at the end on a successful run |
+| `attempts` | every request attempt for this source, in order: `{ engine, keyIndex?, ok, error?, durationSeconds, cost?, credits? }`. `keyIndex` is a zero-based index present only when that engine has multiple configured keys. Single-key and keyless attempts keep the previous shape without it. `ok: false` entries carry the failure `error`. An engine that reports spend adds `cost` (exa, US dollars) or `credits` (firecrawl). Both are optional and absent on engines that report neither. An engine skipped because the run's `--deadline` was already used up has `ok: false`, an `error` that says so, and `durationSeconds: null`. One `ok: true` entry at the end on a successful run |
 | `durationSeconds` | how long this one source took, or `null` when nothing ran |
 
 The remaining fields depend on the mode.
@@ -101,8 +101,8 @@ for:
   and `warnings` explains that web data cannot see inside X. Do not present a
   degraded entry as X coverage.
 - `unavailable`: nothing could serve the source. `engine` is `null`, `items` is
-  empty, `attempts` is empty, `durationSeconds` is `null`, and `warnings` says
-  why. This appears for the X slot of a `--source web,x` run when X is
+  empty, `attempts` lists the engines that were tried and failed (empty when
+  none could start), `durationSeconds` is `null`, and `warnings` says why. This appears for the X slot of a `--source web,x` run when X is
   unreachable, so the slot is explicit rather than silently missing:
 
 ```json

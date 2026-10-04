@@ -93,6 +93,9 @@ program
         prompt: options.prompt,
         timeoutMs,
         deadlineMs,
+        // Count the deadline from process start, so Node startup and config
+        // loading come out of the budget the caller is holding.
+        deadlineStartedAt: performance.timeOrigin,
         maxResults,
         workdir: options.workdir,
         allowPrivateNetwork: options.allowPrivateNetwork,
@@ -116,7 +119,9 @@ program
           `Known engines: ${listEngines().join(', ')}`,
         ].join('\n') + '\n',
       );
-      process.exit(1);
+      // Not process.exit: an engine that ignored SIGTERM still has its SIGKILL
+      // pending, and exiting on the spot would cancel it and orphan the child.
+      process.exitCode = 1;
     }
   });
 
