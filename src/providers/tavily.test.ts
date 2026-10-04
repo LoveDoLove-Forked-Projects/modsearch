@@ -211,4 +211,30 @@ describe('tavily provider', () => {
     ).rejects.toThrow(/tavily timed out after 20 ms/);
     expect(sawAbort).toBe(true);
   });
+
+  it('keeps the timeout armed while the response body streams', async () => {
+    // Headers arrive at once, then the body never finishes: only an abort that
+    // is still armed after the headers can end the read.
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      text: () =>
+        new Promise<string>((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          );
+        }),
+      json: () => new Promise(() => {}),
+    }));
+
+    await expect(
+      executeTavilySearch({
+        mode: 'search',
+        query: 'q',
+        timeoutMs: 20,
+        settings: { apiKey: 'tvly-test' },
+      }),
+    ).rejects.toThrow(/tavily timed out after 20 ms/);
+  });
 });

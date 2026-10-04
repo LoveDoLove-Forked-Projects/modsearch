@@ -11,7 +11,9 @@
 // error. --allow-private-network authorizes local access, never cloud disclosure.
 import { ApiKeyFailureError, isQuotaFailureMessage, splitApiKeys } from '../util/apiKeys.ts';
 import { redactSecrets } from '../util/redact.ts';
+import { requestText } from '../util/timedRequest.ts';
 import {
+  type CloudDisclosureInspection,
   inspectCloudDisclosureTarget,
   isLiteralReservedTarget,
   normalizeFetchUrl,
@@ -62,57 +64,51 @@ export async function executeFirecrawl(options: EngineRequest): Promise<EngineOu
   return options.mode === 'fetch' ? firecrawlFetch(options) : firecrawlSearch(options);
 }
 
-async function firecrawlPost(
+/**
+ * POST to the Firecrawl API and read the whole body under `signal`, so the
+ * timeout covers the body as well as the headers. Non-2xx responses become
+ * actionable errors here. Returns the parsed JSON of a 2xx response.
+ */
+async function firecrawlPost<T>(
   url: string,
   apiKey: string | null,
   apiKeySecrets: readonly string[],
   body: unknown,
+  signal: AbortSignal,
   timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  timer.unref?.();
-  try {
-    // No key means keyless mode: the endpoint accepts requests with no
-    // Authorization header under Firecrawl's free keyless allowance (1,000
-    // credits/month per their announcement, metered as per-IP daily caps).
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
-    if (apiKey) {
-      headers.authorization = `Bearer ${apiKey}`;
-    }
-    return await fetch(url, {
-      method: 'POST',
-      signal: controller.signal,
-      headers,
-      body: JSON.stringify(body),
-    });
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(`firecrawl timed out after ${timeoutMs} ms.`);
-    }
-    throw new Error(
-      `firecrawl request failed: ${redactSecrets(
-        error instanceof Error ? error.message : String(error),
-        apiKeySecrets,
-      )}`,
-    );
-  } finally {
-    clearTimeout(timer);
+): Promise<T> {
+  // No key means keyless mode: the endpoint accepts requests with no
+  // Authorization header under Firecrawl's free keyless allowance (1,000
+  // credits/month per their announcement, metered as per-IP daily caps).
+  const headers: Record<string, string> = { 'content-type': 'application/json' };
+  if (apiKey) {
+    headers.authorization = `Bearer ${apiKey}`;
   }
+  const { response, text } = await requestText(
+    'firecrawl',
+    url,
+    { method: 'POST', headers, body: JSON.stringify(body) },
+    signal,
+    timeoutMs,
+    apiKeySecrets,
+  );
+  ensureOk(response, text, apiKey, apiKeySecrets);
+  return JSON.parse(text) as T;
 }
 
 /** Turn a non-2xx API response into an actionable error, quota class included. */
-async function ensureOk(
+function ensureOk(
   response: Response,
+  text: string,
   apiKey: string | null,
   apiKeySecrets: readonly string[],
-): Promise<void> {
+): void {
   if (response.ok) {
     return;
   }
   // The API's error body is foreign text that loves to echo the Authorization
   // header; scrub it before it travels into messages.
-  const detail = redactSecrets((await response.text().catch(() => '')).trim(), apiKeySecrets);
+  const detail = redactSecrets(text.trim(), apiKeySecrets);
   const message = `firecrawl returned ${response.status} ${response.statusText}.${detail ? ` ${detail}` : ''}`;
   if (response.status >= 500) {
     throw new Error(message);
@@ -151,7 +147,7 @@ async function firecrawlSearch(options: EngineRequest): Promise<EngineOutput> {
   const limit = options.maxResults ?? DEFAULT_LIMIT;
   const startedAt = Date.now();
 
-  const response = await firecrawlPost(
+  const data = await firecrawlPost<FirecrawlSearchResponse>(
     resolveEndpoint(options.settings.baseURL, FIRECRAWL_DEFAULT_BASE, '/v2/search'),
     apiKey,
     apiKeySecrets,
@@ -161,10 +157,9 @@ async function firecrawlSearch(options: EngineRequest): Promise<EngineOutput> {
       sources: ['web'],
       timeout: clampTimeout(options.timeoutMs),
     },
+    AbortSignal.timeout(options.timeoutMs),
     options.timeoutMs,
   );
-  await ensureOk(response, apiKey, apiKeySecrets);
-  const data = (await response.json()) as FirecrawlSearchResponse;
 
   const items = (data.data?.web ?? []).map((r) => ({
     title: r.title ?? '',
@@ -203,6 +198,8 @@ async function firecrawlFetch(options: EngineRequest): Promise<EngineOutput> {
   const apiKey = apiKeys[0] ?? null;
   const apiKeySecrets = [...new Set([...apiKeys, ...(options.apiKeySecrets ?? [])])];
   const target = normalizeFetchUrl(options.url);
+  // One deadline for the DNS check, the request, and the body.
+  const deadline = AbortSignal.timeout(options.timeoutMs);
 
   // A literal private target never leaves the machine. DNS-only classification
   // is advisory for cloud disclosure: standard 198.18/15 proxy fake IPs count
@@ -213,7 +210,15 @@ async function firecrawlFetch(options: EngineRequest): Promise<EngineOutput> {
       `firecrawl does not fetch the private or reserved target ${target.hostname}. Use the local engine instead.`,
     );
   }
-  const disclosure = await inspectCloudDisclosureTarget(target);
+  let disclosure: CloudDisclosureInspection;
+  try {
+    disclosure = await inspectCloudDisclosureTarget(target, deadline);
+  } catch (error) {
+    if (deadline.aborted) {
+      throw new Error(`firecrawl timed out after ${options.timeoutMs} ms.`);
+    }
+    throw error;
+  }
   if (disclosure.reserved) {
     const resolved =
       disclosure.addresses.length > 0 ? ` -> ${disclosure.addresses.join(', ')}` : '';
@@ -223,7 +228,7 @@ async function firecrawlFetch(options: EngineRequest): Promise<EngineOutput> {
   }
 
   const startedAt = Date.now();
-  const response = await firecrawlPost(
+  const data = await firecrawlPost<FirecrawlScrapeResponse>(
     resolveEndpoint(options.settings.baseURL, FIRECRAWL_DEFAULT_BASE, '/v2/scrape'),
     apiKey,
     apiKeySecrets,
@@ -242,10 +247,9 @@ async function firecrawlFetch(options: EngineRequest): Promise<EngineOutput> {
       skipTlsVerification: false,
       timeout: clampTimeout(options.timeoutMs),
     },
+    deadline,
     options.timeoutMs,
   );
-  await ensureOk(response, apiKey, apiKeySecrets);
-  const data = (await response.json()) as FirecrawlScrapeResponse;
 
   const metadata = data.data?.metadata ?? {};
   const statusCode = metadata.statusCode;

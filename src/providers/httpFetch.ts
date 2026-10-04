@@ -184,7 +184,15 @@ export async function runFetch(options: FetchOptions): Promise<FetchResult> {
     for (let i = 0; i <= maxRedirects; i += 1) {
       // Preflight every hop. Pin the socket on the direct path. A system HTTP
       // proxy does DNS itself, so that path does not pin.
-      const pinned = await assertSafeRemoteTarget(currentUrl, allowPrivateNetwork);
+      let pinned: PinnedTarget;
+      try {
+        pinned = await assertSafeRemoteTarget(currentUrl, allowPrivateNetwork, deadline);
+      } catch (error) {
+        if (deadline.aborted) {
+          throw new Error(`Request timed out after ${timeoutMs} ms.`);
+        }
+        throw error;
+      }
       const proxyUrl = resolveProxyForUrl(currentUrl, process.env);
       const dispatcher = proxyUrl
         ? proxyDispatcher(proxyUrl, allowPrivateNetwork)

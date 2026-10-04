@@ -5,6 +5,7 @@
 // so the summary here is mechanical and a warning tells the reader to work from
 // items directly.
 import { redactSecrets } from '../util/redact.ts';
+import { requestText } from '../util/timedRequest.ts';
 import { ApiKeyFailureError, isQuotaFailureMessage, splitApiKeys } from '../util/apiKeys.ts';
 import type { EngineRequest, EngineOutput, SearchEngine } from './index.ts';
 import { resolveEndpoint } from './endpoint.ts';
@@ -47,16 +48,12 @@ export async function executeExaSearch(options: EngineRequest): Promise<EngineOu
   const startedAt = Date.now();
 
   // Own the abort signal so a --timeout shorter than any server-side ceiling is
-  // enforced here, and cancelling truly tears down the underlying request.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-  timer.unref?.();
-
-  let response: Response;
-  try {
-    response = await fetch(resolveEndpoint(options.settings.baseURL, EXA_DEFAULT_BASE, '/search'), {
+  // enforced here, body included, and cancelling truly tears down the request.
+  const { response, text } = await requestText(
+    'exa',
+    resolveEndpoint(options.settings.baseURL, EXA_DEFAULT_BASE, '/search'),
+    {
       method: 'POST',
-      signal: controller.signal,
       headers: {
         'content-type': 'application/json',
         'x-api-key': apiKey,
@@ -66,28 +63,16 @@ export async function executeExaSearch(options: EngineRequest): Promise<EngineOu
         numResults,
         contents: { highlights: true },
       }),
-    });
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(`exa timed out after ${options.timeoutMs} ms.`);
-    }
-    throw new Error(
-      `exa request failed: ${redactSecrets(error instanceof Error ? error.message : String(error), [
-        ...apiKeySecrets,
-        options.settings.baseURL,
-      ])}`,
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+    },
+    AbortSignal.timeout(options.timeoutMs),
+    options.timeoutMs,
+    [...apiKeySecrets, options.settings.baseURL],
+  );
 
   if (!response.ok) {
     // The gateway's error body is foreign text that loves to echo the
     // Authorization header; scrub it before it travels into messages.
-    const detail = redactSecrets((await response.text().catch(() => '')).trim(), [
-      ...apiKeySecrets,
-      options.settings.baseURL,
-    ]);
+    const detail = redactSecrets(text.trim(), [...apiKeySecrets, options.settings.baseURL]);
     if (response.status >= 500) {
       throw new Error(
         `exa returned ${response.status} ${response.statusText}.${detail ? ` ${detail}` : ''}`,
@@ -111,7 +96,7 @@ export async function executeExaSearch(options: EngineRequest): Promise<EngineOu
     );
   }
 
-  const data = (await response.json()) as ExaResponse;
+  const data = JSON.parse(text) as ExaResponse;
 
   const items = (data.results ?? []).map((r) => {
     const item: {

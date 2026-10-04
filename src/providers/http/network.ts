@@ -99,6 +99,7 @@ export function isPrivateIpAddress(ipAddress: string): boolean {
 export async function assertSafeRemoteTarget(
   url: URL,
   allowPrivateNetwork: boolean,
+  signal?: AbortSignal,
 ): Promise<PinnedTarget> {
   if (isBlockedHostname(url.hostname)) {
     throw new Error(`Blocked hostname: ${url.hostname}`);
@@ -120,8 +121,11 @@ export async function assertSafeRemoteTarget(
 
   let resolved: Array<{ address: string; family: number }>;
   try {
-    resolved = await dns.lookup(hostname, { all: true, verbatim: true });
+    resolved = await lookupAll(hostname, signal);
   } catch (error) {
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     throw new Error(
       `DNS lookup failed for host ${hostname}: ${error instanceof Error ? error.message : String(error)}`,
     );
@@ -193,7 +197,10 @@ export async function isReservedTarget(url: URL): Promise<boolean> {
  * DNS answers share the local guard's IPv4 fake-IP exemption. Literal private
  * or reserved targets, including 198.18/15 addresses, remain reserved.
  */
-export async function inspectCloudDisclosureTarget(url: URL): Promise<CloudDisclosureInspection> {
+export async function inspectCloudDisclosureTarget(
+  url: URL,
+  signal?: AbortSignal,
+): Promise<CloudDisclosureInspection> {
   if (isBlockedHostname(url.hostname)) {
     return { reserved: true, addresses: [] };
   }
@@ -205,7 +212,7 @@ export async function inspectCloudDisclosureTarget(url: URL): Promise<CloudDiscl
   }
 
   try {
-    const resolved = await dns.lookup(hostname, { all: true, verbatim: true });
+    const resolved = await lookupAll(hostname, signal);
     const addresses = resolved.map((record) => record.address);
     return {
       reserved:
@@ -213,8 +220,40 @@ export async function inspectCloudDisclosureTarget(url: URL): Promise<CloudDiscl
       addresses,
     };
   } catch {
+    // Out of time is the caller's deadline, not an unknown target.
+    if (signal?.aborted) {
+      throw signal.reason;
+    }
     // Cannot confirm it is private from here, so do not block the cloud engine.
     return { reserved: false, addresses: [] };
+  }
+}
+
+/**
+ * Resolve every address for a hostname, giving up when `signal` fires. The
+ * system resolver cannot be cancelled, so a slow lookup is abandoned rather
+ * than stopped: the caller's deadline holds either way.
+ */
+async function lookupAll(
+  hostname: string,
+  signal?: AbortSignal,
+): Promise<Array<{ address: string; family: number }>> {
+  if (!signal) {
+    return dns.lookup(hostname, { all: true, verbatim: true });
+  }
+  signal.throwIfAborted();
+  const lookup = dns.lookup(hostname, { all: true, verbatim: true });
+  // An abandoned lookup that fails later must not surface as unhandled.
+  lookup.catch(() => {});
+  let onAbort = () => {};
+  const aborted = new Promise<never>((_resolve, reject) => {
+    onAbort = () => reject(signal.reason);
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    return await Promise.race([lookup, aborted]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
   }
 }
 

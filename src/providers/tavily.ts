@@ -8,6 +8,7 @@
 // https://docs.tavily.com/documentation/api-reference/endpoint/search
 import { ApiKeyFailureError, isQuotaFailureMessage, splitApiKeys } from '../util/apiKeys.ts';
 import { redactSecrets } from '../util/redact.ts';
+import { requestText } from '../util/timedRequest.ts';
 import type { EngineRequest, EngineOutput, SearchEngine } from './index.ts';
 import { resolveEndpoint } from './endpoint.ts';
 
@@ -46,52 +47,33 @@ export async function executeTavilySearch(options: EngineRequest): Promise<Engin
   const startedAt = Date.now();
 
   // Own the abort signal so a --timeout shorter than any server-side ceiling is
-  // enforced here, and cancelling truly tears down the underlying request
-  // instead of leaving it running while we walk away.
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs);
-  timer.unref?.();
-
-  let response: Response;
-  try {
-    response = await fetch(
-      resolveEndpoint(options.settings.baseURL, TAVILY_DEFAULT_BASE, '/search'),
-      {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          query: options.query,
-          search_depth: 'basic',
-          include_answer: true,
-          max_results: maxResults,
-        }),
+  // enforced here, body included, and cancelling truly tears down the
+  // underlying request instead of leaving it running while we walk away.
+  const { response, text } = await requestText(
+    'tavily',
+    resolveEndpoint(options.settings.baseURL, TAVILY_DEFAULT_BASE, '/search'),
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${apiKey}`,
       },
-    );
-  } catch (error) {
-    if (controller.signal.aborted) {
-      throw new Error(`tavily timed out after ${options.timeoutMs} ms.`);
-    }
-    throw new Error(
-      `tavily request failed: ${redactSecrets(
-        error instanceof Error ? error.message : String(error),
-        [...apiKeySecrets, options.settings.baseURL],
-      )}`,
-    );
-  } finally {
-    clearTimeout(timer);
-  }
+      body: JSON.stringify({
+        query: options.query,
+        search_depth: 'basic',
+        include_answer: true,
+        max_results: maxResults,
+      }),
+    },
+    AbortSignal.timeout(options.timeoutMs),
+    options.timeoutMs,
+    [...apiKeySecrets, options.settings.baseURL],
+  );
 
   if (!response.ok) {
     // The gateway's error body is foreign text that loves to echo the
     // Authorization header; scrub it before it travels into messages.
-    const detail = redactSecrets((await response.text().catch(() => '')).trim(), [
-      ...apiKeySecrets,
-      options.settings.baseURL,
-    ]);
+    const detail = redactSecrets(text.trim(), [...apiKeySecrets, options.settings.baseURL]);
     const message = `tavily returned ${response.status} ${response.statusText}.${detail ? ` ${detail}` : ''}`;
     // Server failures are not evidence that the selected key is bad, even if
     // an upstream error page happens to mention quota.
@@ -118,7 +100,7 @@ export async function executeTavilySearch(options: EngineRequest): Promise<Engin
     throw new Error(message);
   }
 
-  const data = (await response.json()) as TavilyResponse;
+  const data = JSON.parse(text) as TavilyResponse;
 
   const items = (data.results ?? []).map((r) => ({
     title: r.title ?? '',
