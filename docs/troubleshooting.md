@@ -179,6 +179,12 @@ antigravity-cli engine timed out after 210000 ms.
 
 Retry once with `--timeout 300000`. If it still times out, the engine is stuck rather than slow: check `agy` interactively. Engines that ignore SIGTERM are escalated to SIGKILL, so a timeout always returns promptly even when the process does not cooperate.
 
+```
+firecrawl: skipped: the run deadline of 55000 ms was used up before it could start.
+```
+
+The run was started with `--deadline` (the dsh plugin always passes one) and the engines before this one used up the whole budget, so it never ran. Usually the first engine was slow. Lower `--timeout` so one engine cannot take the whole budget, or raise `--deadline` if the caller can wait longer. In dsh these are `providerTimeoutMs` and `providerDeadlineMs`, see [the dsh doc](dsh.md#configure-the-dsh-plugin).
+
 ## Grok Build stopped before searching X
 
 ```

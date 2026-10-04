@@ -45,7 +45,8 @@ Output is always a `results` array, one entry per corpus:
 | `-m, --model <name>` | Engine model | `gemini-3.6-flash-low` |
 | `--prompt <text>` | Extra constraints for this run, passed to the engine | |
 | `--max-results <n>` | Maximum search results | `8` |
-| `--timeout <ms>` | Engine timeout | `180000` |
+| `--timeout <ms>` | Time one engine may take. A failed engine hands over to the next with a fresh budget | `180000` |
+| `--deadline <ms>` | Time the whole run may take, every engine included. Each engine gets the smaller of `--timeout` and what is left, and engines whose turn comes after it are skipped | none |
 | `--workdir <path>` | Working directory for engines that run a command | current directory |
 | `--allow-private-network` | Let the local fetcher reach reserved ranges, for VPNs that map public hosts into them | off |
 

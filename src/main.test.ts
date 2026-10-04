@@ -76,3 +76,52 @@ describe('CLI entry point', () => {
     );
   });
 });
+
+describe('search flags', () => {
+  async function runCli(args: string[]) {
+    const runSearch = vi.fn(async () => ({ mode: 'search', results: [], meta: {} }));
+    vi.doMock('./search.ts', () => ({ runSearch }));
+    ({ restore: restoreHome } = withTempHome());
+    process.argv = [process.execPath, '/package/dist/main.js', ...args];
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+    await import('./main.ts');
+    await vi.waitFor(() => {
+      expect(runSearch.mock.calls.length + exit.mock.calls.length).toBeGreaterThan(0);
+    });
+    return { runSearch, stderr, exit };
+  }
+
+  afterEach(() => {
+    vi.doUnmock('./search.ts');
+  });
+
+  it('passes --deadline through as the run-wide budget', async () => {
+    const { runSearch } = await runCli([
+      '-q',
+      'anything',
+      '--timeout',
+      '40000',
+      '--deadline',
+      '55000',
+    ]);
+    expect(runSearch).toHaveBeenCalledWith(
+      expect.objectContaining({ timeoutMs: 40_000, deadlineMs: 55_000 }),
+    );
+  });
+
+  it('leaves the run uncapped without --deadline', async () => {
+    const { runSearch } = await runCli(['-q', 'anything']);
+    expect(runSearch).toHaveBeenCalledWith(expect.objectContaining({ deadlineMs: undefined }));
+  });
+
+  it('rejects a --deadline that is not a positive integer', async () => {
+    const { runSearch, stderr, exit } = await runCli(['-q', 'anything', '--deadline', '0']);
+    expect(exit).toHaveBeenCalledWith(1);
+    expect(runSearch).not.toHaveBeenCalled();
+    expect(String(stderr.mock.calls.map((call) => call[0]).join(''))).toContain(
+      'Invalid --deadline',
+    );
+  });
+});

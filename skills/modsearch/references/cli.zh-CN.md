@@ -45,7 +45,8 @@ modsearch -q "reactions on X" --source x       # 搜 X，关于 X 的查询会�
 | `-m, --model <name>` | 引擎模型 | `gemini-3.6-flash-low` |
 | `--prompt <text>` | 本次运行的附加约束，传给引擎 | |
 | `--max-results <n>` | 搜索结果上限 | `8` |
-| `--timeout <ms>` | 引擎超时 | `180000` |
+| `--timeout <ms>` | 单个引擎最多用多久。引擎失败后换下一个，下一个重新计时 | `180000` |
+| `--deadline <ms>` | 整次运行最多用多久，所有引擎合计。每个引擎取 `--timeout` 和剩余时间中较小的那个，轮到时已超时的引擎直接跳过 | 无 |
 | `--workdir <path>` | 运行命令类引擎的工作目录 | 当前目录 |
 | `--allow-private-network` | 允许本地抓取器访问保留地址段，给把公网主机映射进去的 VPN 用 | 关 |
 

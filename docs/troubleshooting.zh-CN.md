@@ -179,6 +179,12 @@ antigravity-cli engine timed out after 210000 ms.
 
 先用 `--timeout 300000` 重试一次。还超时的话，引擎是卡住了不是慢：手动开 `agy` 检查。无视 SIGTERM 的引擎会被升级到 SIGKILL，所以就算进程不配合，超时也总能及时返回。
 
+```
+firecrawl: skipped: the run deadline of 55000 ms was used up before it could start.
+```
+
+这次运行带了 `--deadline`（dsh 插件总会带），排在前面的引擎把整个时限用完了，这个引擎根本没开始跑。通常是第一个引擎太慢。可以调低 `--timeout`，别让一个引擎吃掉全部时间，或者在调用方等得起时调高 `--deadline`。在 dsh 里对应 `providerTimeoutMs` 和 `providerDeadlineMs`，见 [dsh 文档](dsh.zh-CN.md#配置-dsh-插件)。
+
 ## Grok Build 在搜索 X 之前就停了
 
 ```

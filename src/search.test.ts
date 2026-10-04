@@ -40,7 +40,7 @@ const itSpawn = it.runIf(SPAWNS_FAKE_CLI);
  * network attempt would make these unit tests flaky and online.
  */
 function agyConfig(
-  fake: { stdout?: string; code?: number },
+  fake: { stdout?: string; code?: number; delaySeconds?: number },
   extra: ModsearchConfig = {},
 ): ModsearchConfig {
   const bin = fakeEngine({ name: 'agy', ...fake });
@@ -538,6 +538,69 @@ describeSpawn('multiple sources run concurrently and fail independently', () => 
       vi.unstubAllGlobals();
     }
   }, 30_000);
+});
+
+describeSpawn('a run deadline bounds the whole chain', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    cleanupTempDirs();
+  });
+
+  it('cuts a hung engine at the deadline and skips the engines after it', async () => {
+    // agy would answer after 10s, inside its 20s per-engine budget. The 1.5s
+    // run deadline must end it instead, and firecrawl must not start at all.
+    const fetchCalls: unknown[] = [];
+    vi.stubGlobal('fetch', async (...args: unknown[]) => {
+      fetchCalls.push(args);
+      throw new Error('firecrawl should not run once the deadline is spent');
+    });
+    const config = agyConfig({ stdout: agySearchEnvelope('late'), delaySeconds: 10 });
+    const startedAt = Date.now();
+    const error = (await runSearch({
+      query: 'anything',
+      config,
+      env: BARE_ENV,
+      timeoutMs: 20_000,
+      deadlineMs: 1_500,
+    }).catch((caught: unknown) => caught)) as Error & { attempts: EngineAttempt[] };
+
+    expect(Date.now() - startedAt).toBeLessThan(4_000);
+    expect(error.message).toMatch(/Every engine for the web source failed/);
+    expect(error.message).toMatch(/run deadline of 1500 ms/);
+    expect(fetchCalls).toHaveLength(0);
+    expect(error.attempts[0]).toMatchObject({ engine: 'antigravity-cli', ok: false });
+    expect(error.attempts[1]).toMatchObject({
+      engine: 'firecrawl',
+      ok: false,
+      durationSeconds: null,
+      error: expect.stringMatching(/run deadline of 1500 ms/),
+    });
+  }, 20_000);
+
+  it('gives the next engine only the time the deadline has left', async () => {
+    // agy fails after ~1s. firecrawl hangs until aborted: with a 20s per-engine
+    // budget it would hold the run for 20s, so the deadline has to cap it.
+    vi.stubGlobal('fetch', (_url: unknown, init: { signal: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      });
+    });
+    const config = agyConfig({ code: 1, delaySeconds: 1 });
+    const startedAt = Date.now();
+    const error = (await runSearch({
+      query: 'anything',
+      config,
+      env: BARE_ENV,
+      timeoutMs: 20_000,
+      deadlineMs: 2_500,
+    }).catch((caught: unknown) => caught)) as Error & { attempts: EngineAttempt[] };
+
+    expect(Date.now() - startedAt).toBeLessThan(4_000);
+    const firecrawl = error.attempts.find((attempt) => attempt.engine === 'firecrawl');
+    const capped = Number(/timed out after (\d+) ms/.exec(firecrawl?.error ?? '')?.[1]);
+    expect(capped).toBeGreaterThan(0);
+    expect(capped).toBeLessThan(2_500);
+  }, 20_000);
 });
 
 describe('uncertainty, warnings, and attempts are separate channels', () => {

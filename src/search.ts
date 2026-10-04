@@ -22,7 +22,15 @@ export interface RunSearchOptions {
   sources?: string;
   model?: string;
   prompt?: string;
+  /** Per-engine budget: each attempt gets this long. */
   timeoutMs?: number;
+  /**
+   * Wall-clock budget for the whole run, counted from its start. Each attempt
+   * gets the smaller of `timeoutMs` and what is left, and an engine whose turn
+   * comes after the budget is spent is skipped. Absent means no run-wide cap,
+   * so a chain of N engines may take up to N times `timeoutMs`.
+   */
+  deadlineMs?: number;
   maxResults?: number;
   workdir?: string;
   /** One-off override for the local engine's private network guard. */
@@ -192,7 +200,11 @@ export async function runSearch(options: RunSearchOptions): Promise<RunSearchRes
       : undefined,
   });
 
-  const context = { mode, query, url, timeoutMs, config, env, options };
+  const deadline =
+    options.deadlineMs === undefined
+      ? undefined
+      : { at: startedAt + options.deadlineMs, ms: options.deadlineMs };
+  const context = { mode, query, url, timeoutMs, deadline, config, env, options };
 
   // Run every source's plan concurrently and reassemble in request order, so a
   // web,x run costs about the time of its slowest source, not their sum.
@@ -231,12 +243,13 @@ async function runOneSource(
     query?: string;
     url?: string;
     timeoutMs: number;
+    deadline?: RunDeadline;
     config: ModsearchConfig;
     env: NodeJS.ProcessEnv;
     options: RunSearchOptions;
   },
 ): Promise<SourceResult> {
-  const { mode, query, url, timeoutMs, config, env, options } = context;
+  const { mode, query, url, timeoutMs, deadline, config, env, options } = context;
 
   // The source was asked for but nothing can serve it. Return an explicit
   // empty entry rather than dropping the slot, so a consumer sees it was
@@ -306,6 +319,15 @@ async function runOneSource(
     let successfulKeyIndex: number | undefined;
     for (let runIndex = 0; runIndex < keyRuns.length; runIndex += 1) {
       const keyRun = keyRuns[runIndex];
+      const budget = attemptBudget(timeoutMs, deadline);
+      if (!budget) {
+        // The run is out of time: record the engine as skipped rather than
+        // starting it, so the trail shows the deadline, not a silent gap.
+        const message = `skipped: the run deadline of ${deadline?.ms} ms was used up before it could start.`;
+        failures.push(`${engine.name}: ${message}`);
+        attempts.push({ engine: engine.name, ok: false, error: message, durationSeconds: null });
+        break;
+      }
       const startedAt = Date.now();
       try {
         output = await callEngine(
@@ -318,12 +340,12 @@ async function runOneSource(
             maxResults: options.maxResults,
             extraPrompt: options.prompt,
             workdir: options.workdir,
-            timeoutMs,
+            timeoutMs: budget.engineTimeoutMs,
             settings: { ...settings, apiKey: keyRun.apiKey },
             apiKeySecrets: apiKeys,
             allowPrivateNetwork,
           },
-          timeoutMs,
+          budget.killAfterMs,
         );
         successfulStartedAt = startedAt;
         successfulKeyIndex = keyRun.keyIndex;
@@ -454,10 +476,38 @@ async function runOneSource(
   );
 }
 
+/** The run-wide deadline: when it falls, and the budget it came from. */
+interface RunDeadline {
+  at: number;
+  ms: number;
+}
+
+/**
+ * The time one attempt may take: the engine's own timeout, and the moment a
+ * subprocess engine is killed if it ignores that timeout. Both are capped by
+ * what the run deadline has left. Null when the deadline is already spent.
+ */
+function attemptBudget(
+  timeoutMs: number,
+  deadline: RunDeadline | undefined,
+): { engineTimeoutMs: number; killAfterMs: number } | null {
+  if (!deadline) {
+    return { engineTimeoutMs: timeoutMs, killAfterMs: timeoutMs + KILL_GRACE_MS };
+  }
+  const remaining = deadline.at - Date.now();
+  if (remaining <= 0) {
+    return null;
+  }
+  return {
+    engineTimeoutMs: Math.min(timeoutMs, remaining),
+    killAfterMs: Math.min(timeoutMs + KILL_GRACE_MS, remaining),
+  };
+}
+
 async function callEngine(
   engine: SearchEngine,
   request: EngineRequest,
-  timeoutMs: number,
+  killAfterMs: number,
 ): Promise<EngineOutput> {
   if (engine.execute) {
     return engine.execute(request);
@@ -467,7 +517,7 @@ async function callEngine(
     const commandResult = await runCommand(
       engine.name,
       invocation,
-      timeoutMs + KILL_GRACE_MS,
+      killAfterMs,
       engine.describeFailure,
     );
     return engine.parseOutput(commandResult.stdout);

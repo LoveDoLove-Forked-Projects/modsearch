@@ -52,6 +52,10 @@ program
   .option('--prompt <text>', 'Extra constraints for this run')
   .option('--max-results <n>', 'Maximum number of search results', '8')
   .option('--timeout <ms>', 'Engine timeout in milliseconds', '180000')
+  .option(
+    '--deadline <ms>',
+    'Wall-clock budget for the whole run in milliseconds, across every engine tried (default: none)',
+  )
   .option('--workdir <path>', 'Working directory for engines that run a command')
   .option(
     '--allow-private-network',
@@ -62,6 +66,14 @@ program
       const timeoutMs = Number.parseInt(options.timeout, 10);
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
         throw new Error('Invalid --timeout. Use a positive integer in milliseconds.');
+      }
+
+      let deadlineMs: number | undefined;
+      if (options.deadline !== undefined) {
+        deadlineMs = Number.parseInt(options.deadline, 10);
+        if (!Number.isFinite(deadlineMs) || deadlineMs <= 0) {
+          throw new Error('Invalid --deadline. Use a positive integer in milliseconds.');
+        }
       }
 
       const maxResults = Number.parseInt(options.maxResults, 10);
@@ -80,6 +92,7 @@ program
         model: options.model,
         prompt: options.prompt,
         timeoutMs,
+        deadlineMs,
         maxResults,
         workdir: options.workdir,
         allowPrivateNetwork: options.allowPrivateNetwork,
