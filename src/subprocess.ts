@@ -57,6 +57,7 @@ export function runCommand(
     // proves it is actually gone.
     let exitCode: number | null = null;
     let exited = false;
+    let killTimer: NodeJS.Timeout | undefined;
 
     const timer = setTimeout(() => {
       timedOut = true;
@@ -64,13 +65,10 @@ export function runCommand(
       // A child that ignores SIGTERM used to keep the caller waiting for as
       // long as it liked, so report the timeout now and make sure it dies.
       settle(null);
-      setTimeout(() => {
-        // Escalate only when the child is still running. A process that
-        // honored SIGTERM has already fired 'exit', so this does nothing.
-        if (!exited) {
-          child.kill('SIGKILL');
-        }
-      }, SIGKILL_GRACE_MS).unref();
+      // Escalate only when the child is still running: 'exit' clears this. It
+      // holds the event loop on purpose, so a caller that ends right after the
+      // timeout still sends the SIGKILL instead of orphaning the child.
+      killTimer = setTimeout(() => child.kill('SIGKILL'), SIGKILL_GRACE_MS);
     }, timeoutMs);
 
     const settle = (code: number | null) => {
@@ -146,6 +144,7 @@ export function runCommand(
     child.on('exit', (code) => {
       exitCode = code;
       exited = true;
+      clearTimeout(killTimer);
       restartDrain();
     });
 

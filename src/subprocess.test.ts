@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { execFileSync } from 'child_process';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { runCommand } from './subprocess.ts';
@@ -65,6 +66,35 @@ describe.runIf(SPAWNS_FAKE_CLI)('runCommand timeout handling', () => {
     // vanish. The window is wide so scheduling jitter under load cannot flake it.
     expect(await waitFor(() => processGone(pid), 20_000)).toBe(true);
   }, 45_000);
+});
+
+describe.runIf(SPAWNS_FAKE_CLI)('runCommand kill escalation outlives the caller', () => {
+  it('still SIGKILLs a SIGTERM-ignoring child when the caller has nothing left to do', async () => {
+    // A caller that times the engine out and then simply ends, as the CLI does
+    // after reporting a failed run. A SIGKILL timer that does not hold the
+    // event loop would die with the caller and leave the child running.
+    const dir = tempDir('modsearch-orphan-');
+    const pidFile = path.join(dir, 'pid');
+    const bin = path.join(dir, 'stubborn');
+    fs.writeFileSync(bin, `#!/bin/sh\ntrap '' TERM\necho $$ > "${pidFile}"\nsleep 30\n`, {
+      mode: 0o755,
+    });
+    const script = path.join(dir, 'caller.mjs');
+    const subprocessUrl = new URL('./subprocess.ts', import.meta.url).href;
+    fs.writeFileSync(
+      script,
+      [
+        `import { runCommand } from ${JSON.stringify(subprocessUrl)};`,
+        `await runCommand('stubborn', { command: ${JSON.stringify(bin)}, args: [], cwd: ${JSON.stringify(dir)} }, 1000).catch(() => {});`,
+      ].join('\n'),
+    );
+
+    execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', script]);
+
+    const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+    expect(Number.isFinite(pid)).toBe(true);
+    expect(await waitFor(() => processGone(pid), 10_000)).toBe(true);
+  }, 30_000);
 });
 
 describe.runIf(SPAWNS_FAKE_CLI)('runCommand child environment', () => {
