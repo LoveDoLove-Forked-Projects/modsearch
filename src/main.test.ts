@@ -77,25 +77,36 @@ describe('CLI entry point', () => {
   });
 });
 
+/** A stream write stub that reports the chunk as flushed, as a real stream would. */
+function acceptWrite(...args: unknown[]): boolean {
+  const callback = args.find((arg) => typeof arg === 'function') as (() => void) | undefined;
+  callback?.();
+  return true;
+}
+
 describe('search flags', () => {
-  async function runCli(args: string[]) {
+  async function runCli(args: string[], pendingKills: Promise<void> = Promise.resolve()) {
     const runSearch = vi.fn(async () => ({ mode: 'search', results: [], meta: {} }));
     vi.doMock('./search.ts', () => ({ runSearch }));
+    const waitForPendingKills = vi.fn(() => pendingKills);
+    vi.doMock('./subprocess.ts', () => ({ waitForPendingKills }));
     ({ restore: restoreHome } = withTempHome());
     process.argv = [process.execPath, '/package/dist/main.js', ...args];
-    vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    vi.spyOn(process.stdout, 'write').mockImplementation(acceptWrite);
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(acceptWrite);
     const exit = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
-    await import('./main.ts');
+    // The entry awaits the whole action at top level, pending kills included,
+    // so the import is not awaited here: a test may be holding those kills.
+    const loading = import('./main.ts');
     await vi.waitFor(() => {
       expect(runSearch.mock.calls.length + stderr.mock.calls.length).toBeGreaterThan(0);
     });
-    return { runSearch, stderr, exit };
+    return { runSearch, stderr, exit, waitForPendingKills, loading };
   }
 
   afterEach(() => {
     vi.doUnmock('./search.ts');
-    process.exitCode = undefined;
+    vi.doUnmock('./subprocess.ts');
   });
 
   it('passes --deadline through as the run-wide budget', async () => {
@@ -118,6 +129,22 @@ describe('search flags', () => {
     );
   });
 
+  it('exits once pending engine kills land, so abandoned work cannot hold it open', async () => {
+    // A timed-out lookup or an abandoned engine may still hold the event loop,
+    // so the CLI ends itself. It waits for a pending SIGKILL first, or exiting
+    // would orphan an engine that ignored SIGTERM.
+    let releaseKills = () => {};
+    const pendingKills = new Promise<void>((resolve) => {
+      releaseKills = resolve;
+    });
+    const { exit, waitForPendingKills, loading } = await runCli(['-q', 'anything'], pendingKills);
+    await vi.waitFor(() => expect(waitForPendingKills).toHaveBeenCalled());
+    expect(exit).not.toHaveBeenCalled();
+    releaseKills();
+    await loading;
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
   it('leaves the run uncapped without --deadline', async () => {
     const { runSearch } = await runCli(['-q', 'anything']);
     expect(runSearch).toHaveBeenCalledWith(expect.objectContaining({ deadlineMs: undefined }));
@@ -125,11 +152,7 @@ describe('search flags', () => {
 
   it('rejects a --deadline that is not a positive integer', async () => {
     const { runSearch, stderr, exit } = await runCli(['-q', 'anything', '--deadline', '0']);
-    // A failed run sets the exit code and lets the event loop drain rather
-    // than exiting on the spot, which would cancel a pending SIGKILL for an
-    // engine that ignored SIGTERM.
-    expect(process.exitCode).toBe(1);
-    expect(exit).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
     expect(runSearch).not.toHaveBeenCalled();
     expect(String(stderr.mock.calls.map((call) => call[0]).join(''))).toContain(
       'Invalid --deadline',

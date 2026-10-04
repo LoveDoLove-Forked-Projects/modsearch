@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import { execFileSync } from 'child_process';
 import * as path from 'path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { runCommand } from './subprocess.ts';
+import { runCommand, waitForPendingKills } from './subprocess.ts';
 import { cleanupTempDirs, SPAWNS_FAKE_CLI, tempDir } from './testing/helpers.ts';
 
 afterAll(cleanupTempDirs);
@@ -85,16 +85,58 @@ describe.runIf(SPAWNS_FAKE_CLI)('runCommand kill escalation outlives the caller'
       script,
       [
         `import { runCommand } from ${JSON.stringify(subprocessUrl)};`,
-        `await runCommand('stubborn', { command: ${JSON.stringify(bin)}, args: [], cwd: ${JSON.stringify(dir)} }, 1000).catch(() => {});`,
+        `await runCommand('stubborn', { command: ${JSON.stringify(bin)}, args: [], cwd: ${JSON.stringify(dir)} }, 3000).catch(() => {});`,
       ].join('\n'),
     );
 
-    execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', script]);
+    execFileSync(process.execPath, ['--experimental-strip-types', '--no-warnings', script], {
+      timeout: 20_000,
+    });
 
     const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
     expect(Number.isFinite(pid)).toBe(true);
     expect(await waitFor(() => processGone(pid), 10_000)).toBe(true);
   }, 30_000);
+});
+
+describe.runIf(SPAWNS_FAKE_CLI)('runCommand pending kills', () => {
+  it('arms no kill for an engine that already exited while its pipe drains', async () => {
+    // The engine exits at once, but a descendant keeps stdout open, so the run
+    // is still draining when the 200ms timeout lands. The engine is gone:
+    // there is nothing to escalate, and nothing should hold the caller.
+    // The descendant keeps writing, so the drain window never closes and the
+    // timeout lands after the engine itself is long gone.
+    const dir = tempDir('modsearch-exited-');
+    const bin = path.join(dir, 'exited');
+    fs.writeFileSync(
+      bin,
+      '#!/bin/sh\n(for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do echo x; sleep 0.1; done) &\nexit 0\n',
+      { mode: 0o755 },
+    );
+    await expect(runCommand('exited', { command: bin, args: [], cwd: dir }, 1_000)).rejects.toThrow(
+      /timed out/,
+    );
+    const startedAt = Date.now();
+    await waitForPendingKills();
+    expect(Date.now() - startedAt).toBeLessThan(500);
+  });
+
+  it('lets a caller wait until a SIGTERM-ignoring child is SIGKILLed', async () => {
+    const dir = tempDir('modsearch-pending-kill-');
+    const pidFile = path.join(dir, 'pid');
+    const bin = path.join(dir, 'stubborn');
+    fs.writeFileSync(bin, `#!/bin/sh\ntrap '' TERM\necho $$ > "${pidFile}"\nsleep 30\n`, {
+      mode: 0o755,
+    });
+    // Long enough for the child to install its trap and write its PID before
+    // the SIGTERM lands, even on a loaded machine.
+    await expect(
+      runCommand('stubborn', { command: bin, args: [], cwd: dir }, 3_000),
+    ).rejects.toThrow(/timed out/);
+    await waitForPendingKills();
+    const pid = Number.parseInt(fs.readFileSync(pidFile, 'utf-8').trim(), 10);
+    expect(await waitFor(() => processGone(pid), 2_000)).toBe(true);
+  }, 20_000);
 });
 
 describe.runIf(SPAWNS_FAKE_CLI)('runCommand child environment', () => {

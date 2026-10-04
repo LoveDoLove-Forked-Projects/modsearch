@@ -16,6 +16,7 @@ import { buildCooldownController, clearAllCooldowns, currentStatePath } from './
 import { formatDoctorReport, runDoctor } from './doctor.ts';
 import { findEngine, listEngines } from './providers/index.ts';
 import { runSearch } from './search.ts';
+import { waitForPendingKills } from './subprocess.ts';
 import { readSecret } from './util/secretInput.ts';
 
 if (process.env.MODSEARCH_NESTED) {
@@ -23,6 +24,13 @@ if (process.env.MODSEARCH_NESTED) {
     'modsearch refused to run: it was started from inside an engine that modsearch itself spawned (recursion guard). An engine such as Grok Build tried to call modsearch instead of using its own search tools.\n',
   );
   process.exit(1);
+}
+
+/** Write and wait until the stream has taken it, so exiting cannot cut it short. */
+function writeFully(stream: NodeJS.WriteStream, text: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    stream.write(text, (error) => (error ? reject(error) : resolve()));
+  });
 }
 
 const program = new Command();
@@ -62,6 +70,7 @@ program
     'Allow reserved address ranges for this run, for VPNs that map public hosts into them',
   )
   .action(async (options) => {
+    let exitCode = 0;
     try {
       const timeoutMs = Number.parseInt(options.timeout, 10);
       if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
@@ -111,18 +120,23 @@ program
         fs.writeFileSync(outputPath, output, 'utf-8');
       }
 
-      process.stdout.write(`${output}\n`);
+      await writeFully(process.stdout, `${output}\n`);
     } catch (error) {
-      process.stderr.write(
+      await writeFully(
+        process.stderr,
         [
           `Error: ${error instanceof Error ? error.message : String(error)}`,
           `Known engines: ${listEngines().join(', ')}`,
         ].join('\n') + '\n',
       );
-      // Not process.exit: an engine that ignored SIGTERM still has its SIGKILL
-      // pending, and exiting on the spot would cancel it and orphan the child.
-      process.exitCode = 1;
+      exitCode = 1;
     }
+    // The run is over, but work it abandoned at its deadline (a DNS lookup the
+    // resolver has not answered, an engine that overran) can still hold the
+    // event loop. End the process, once any pending SIGKILL has landed so an
+    // engine that ignored SIGTERM is not orphaned.
+    await waitForPendingKills();
+    process.exit(exitCode);
   });
 
 program

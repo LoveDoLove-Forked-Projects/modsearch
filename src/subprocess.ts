@@ -13,6 +13,20 @@ const DRAIN_GRACE_MS = 500;
 // How long a killed child gets before SIGKILL.
 const SIGKILL_GRACE_MS = 2_000;
 
+// Kill escalations still in flight: each settles when its child exits or the
+// SIGKILL is sent.
+const pendingKills = new Set<Promise<void>>();
+
+/**
+ * Resolve once every timed-out child has exited or been sent SIGKILL. A
+ * caller that ends the process itself waits on this first, or exiting would
+ * cancel the SIGKILL and orphan a child that ignored SIGTERM. Bounded by
+ * SIGKILL_GRACE_MS.
+ */
+export async function waitForPendingKills(): Promise<void> {
+  await Promise.all(pendingKills);
+}
+
 /**
  * Run an engine binary and collect its output.
  *
@@ -65,10 +79,23 @@ export function runCommand(
       // A child that ignores SIGTERM used to keep the caller waiting for as
       // long as it liked, so report the timeout now and make sure it dies.
       settle(null);
-      // Escalate only when the child is still running: 'exit' clears this. It
-      // holds the event loop on purpose, so a caller that ends right after the
-      // timeout still sends the SIGKILL instead of orphaning the child.
-      killTimer = setTimeout(() => child.kill('SIGKILL'), SIGKILL_GRACE_MS);
+      // Escalate only when the child is still running. One that already exited
+      // (a descendant is holding the pipe open) has nothing left to kill.
+      if (exited) {
+        return;
+      }
+      // The timer holds the event loop on purpose, so a caller that ends right
+      // after the timeout still sends the SIGKILL instead of orphaning the
+      // child. 'exit' clears it.
+      const escalation = new Promise<void>((resolve) => {
+        killTimer = setTimeout(() => {
+          child.kill('SIGKILL');
+          resolve();
+        }, SIGKILL_GRACE_MS);
+        child.once('exit', () => resolve());
+      });
+      pendingKills.add(escalation);
+      void escalation.then(() => pendingKills.delete(escalation));
     }, timeoutMs);
 
     const settle = (code: number | null) => {
