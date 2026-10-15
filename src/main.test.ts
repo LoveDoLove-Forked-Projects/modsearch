@@ -107,6 +107,8 @@ describe('search flags', () => {
   afterEach(() => {
     vi.doUnmock('./search.ts');
     vi.doUnmock('./subprocess.ts');
+    vi.useRealTimers();
+    process.exitCode = undefined;
   });
 
   it('passes --deadline through as the run-wide budget', async () => {
@@ -129,19 +131,26 @@ describe('search flags', () => {
     );
   });
 
-  it('exits once pending engine kills land, so abandoned work cannot hold it open', async () => {
-    // A timed-out lookup or an abandoned engine may still hold the event loop,
-    // so the CLI ends itself. It waits for a pending SIGKILL first, or exiting
-    // would orphan an engine that ignored SIGTERM.
+  it('lets the event loop drain after pending engine kills land', async () => {
+    // Exiting on the spot tore down fetch sockets mid-close, which aborts Node
+    // on Windows (libuv async.c assertion, exit 0xC0000409) after a good
+    // result was already written (#38). So the CLI sets its exit code and lets
+    // the loop end the process. It waits for a pending SIGKILL first, or the
+    // exit would orphan an engine that ignored SIGTERM.
     let releaseKills = () => {};
     const pendingKills = new Promise<void>((resolve) => {
       releaseKills = resolve;
     });
     const { exit, waitForPendingKills, loading } = await runCli(['-q', 'anything'], pendingKills);
     await vi.waitFor(() => expect(waitForPendingKills).toHaveBeenCalled());
-    expect(exit).not.toHaveBeenCalled();
+    vi.useFakeTimers();
     releaseKills();
     await loading;
+    expect(process.exitCode).toBe(0);
+    expect(exit).not.toHaveBeenCalled();
+    // Abandoned work (a DNS lookup nobody answers) may still hold the loop,
+    // so a backstop ends the process anyway.
+    vi.runOnlyPendingTimers();
     expect(exit).toHaveBeenCalledWith(0);
   });
 
@@ -151,8 +160,9 @@ describe('search flags', () => {
   });
 
   it('rejects a --deadline that is not a positive integer', async () => {
-    const { runSearch, stderr, exit } = await runCli(['-q', 'anything', '--deadline', '0']);
-    await vi.waitFor(() => expect(exit).toHaveBeenCalledWith(1));
+    const { runSearch, stderr, loading } = await runCli(['-q', 'anything', '--deadline', '0']);
+    await loading;
+    expect(process.exitCode).toBe(1);
     expect(runSearch).not.toHaveBeenCalled();
     expect(String(stderr.mock.calls.map((call) => call[0]).join(''))).toContain(
       'Invalid --deadline',

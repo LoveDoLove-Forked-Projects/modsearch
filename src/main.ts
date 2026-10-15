@@ -26,6 +26,9 @@ if (process.env.MODSEARCH_NESTED) {
   process.exit(1);
 }
 
+/** How long a finished run may wait for abandoned work before it is ended. */
+const EXIT_BACKSTOP_MS = 2_000;
+
 /** Write and wait until the stream has taken it, so exiting cannot cut it short. */
 function writeFully(stream: NodeJS.WriteStream, text: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -131,12 +134,15 @@ program
       );
       exitCode = 1;
     }
-    // The run is over, but work it abandoned at its deadline (a DNS lookup the
-    // resolver has not answered, an engine that overran) can still hold the
-    // event loop. End the process, once any pending SIGKILL has landed so an
-    // engine that ignored SIGTERM is not orphaned.
+    // Wait for any pending SIGKILL so an engine that ignored SIGTERM is not
+    // orphaned, then let the event loop end the process. Exiting on the spot
+    // tore down fetch sockets mid-close, which aborts Node on Windows with a
+    // libuv assertion after the result was already written (#38). Work the
+    // run abandoned at its deadline (a DNS lookup the resolver has not
+    // answered) can still hold the loop, so an unref'd backstop ends it.
     await waitForPendingKills();
-    process.exit(exitCode);
+    process.exitCode = exitCode;
+    setTimeout(() => process.exit(exitCode), EXIT_BACKSTOP_MS).unref();
   });
 
 program
