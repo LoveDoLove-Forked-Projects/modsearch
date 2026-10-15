@@ -209,6 +209,16 @@ describe('dsh web search provider', () => {
     const { providers } = await load();
     await expect(providers[0].search({ query: 'anything' })).rejects.toThrow(/exit 1.*no engines/s);
   });
+
+  it('says how to reinstall when the CLI build is missing, as after a GitHub source install', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'modsearch-dsh-cli-'));
+    created.push(dir);
+    process.env.MODSEARCH_DSH_CLI = path.join(dir, 'dist', 'main.js');
+    const { providers } = await load();
+    await expect(providers[0].search({ query: 'anything' })).rejects.toThrow(
+      /build is missing.*GitHub.*@liustack\/modsearch/s,
+    );
+  });
 });
 
 /** A fake CLI that answers with its own argv as the summary. */

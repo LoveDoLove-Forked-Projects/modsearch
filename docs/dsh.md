@@ -47,6 +47,8 @@ npx -y @deepseek-ai/dsh plugin --profile web list --depth 0
 
 The exact version is intentional. pnpm 11 can hold back very recent releases through `minimumReleaseAge`, which can make `@latest` resolve to an older package. The release process keeps the version in this command synchronized with `package.json`.
 
+In the desktop app's **Add plugin** dialog, enter the package name `@liustack/modsearch`, not the GitHub repository URL. Only the npm package ships the built CLI. A GitHub install brings source only, and pnpm blocks the build step that would fill in the gap.
+
 ## What the bundle changes
 
 The bundle contributes two patch operations:
@@ -187,6 +189,7 @@ If a user patch still names `searchProvider: modsearch`, change or remove that o
 ## Troubleshooting
 
 - `declares no dsh.bundle`: an older ModSearch release landed. Reinstall the exact version shown above.
+- `modsearch's CLI build is missing`, or `Cannot find module .../dist/main.js` on 5.10.6 and older: the plugin was installed from the GitHub repository, which ships no build. Remove it and add it again by package name, `@liustack/modsearch`.
 - `web seam has no registerSearchProvider`: dsh moved a developer-preview interface. `x_search` and `read_page` still register, while web search is skipped with a visible log message. Check the latest dsh release before changing the plugin.
 - `modsearch failed (exit ...)`: run `modsearch doctor`. The error includes the engine attempts made by the CLI.
 - The package appears in `plugin list` but not `--dump-config`: verify it appears in `dsh.profile.bundles` inside `~/.dsh/profiles/<name>/package.json`.

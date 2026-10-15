@@ -16,6 +16,7 @@
 // ~/.modsearch/config.json, shared with every harness.
 import {
   chmodSync,
+  existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
@@ -327,8 +328,25 @@ function childEnv() {
   return process.versions.electron ? { ...process.env, ELECTRON_RUN_AS_NODE: '1' } : process.env;
 }
 
-async function runCli(args, signal) {
+/**
+ * The CLI this plugin spawns. Only the npm package ships dist/: a GitHub
+ * source install (DSH's add dialog takes a repo URL) carries no build, and
+ * the bare "Cannot find module" Node prints then names no way out.
+ */
+function cliPath() {
   const cli = process.env.MODSEARCH_DSH_CLI || CLI_PATH;
+  if (!existsSync(cli)) {
+    throw new Error(
+      `modsearch's CLI build is missing (${cli}). This happens when the plugin was ` +
+        'installed from its GitHub repository, which ships source only. Remove the ' +
+        'plugin and add it again by package name: @liustack/modsearch',
+    );
+  }
+  return cli;
+}
+
+async function runCli(args, signal) {
+  const cli = cliPath();
   const { stdout, stderr, code } = await run(process.execPath, [cli, ...args], signal, childEnv());
   if (code !== 0) {
     throw new Error(`modsearch failed (exit ${code}): ${(stderr || stdout).trim().slice(0, 500)}`);

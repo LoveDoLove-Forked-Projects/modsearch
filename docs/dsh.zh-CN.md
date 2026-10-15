@@ -47,6 +47,8 @@ npx -y @deepseek-ai/dsh plugin --profile web list --depth 0
 
 这里故意写精确版本。pnpm 11 可能通过 `minimumReleaseAge` 扣住刚发布的版本，让 `@latest` 解析成旧包。发布流程会让本命令中的版本与 `package.json` 保持同步。
 
+在桌面版的「添加插件」对话框里，填包名 `@liustack/modsearch`，不要填 GitHub 仓库地址。只有 npm 包带构建好的 CLI。从 GitHub 安装只拿到源码，而 pnpm 会拦下补构建的那一步。
+
 ## bundle 改了什么
 
 bundle 贡献两条 patch：
@@ -187,6 +189,7 @@ npx -y @deepseek-ai/dsh plugin --profile <name> remove @liustack/modsearch
 ## 故障定位
 
 - `declares no dsh.bundle`：装到了旧版 ModSearch。按上方精确版本重新安装。
+- `modsearch's CLI build is missing`，或 5.10.6 及更早版本报 `Cannot find module .../dist/main.js`：插件是从 GitHub 仓库装的，没有构建产物。卸载后按包名 `@liustack/modsearch` 重新添加。
 - `web seam has no registerSearchProvider`：dsh 移动了开发预览接口。`x_search` 与 `read_page` 仍会注册，网页搜索则跳过并打印明确日志。修改插件前先检查最新 dsh release。
 - `modsearch failed (exit ...)`：运行 `modsearch doctor`。错误会保留 CLI 尝试过的引擎。
 - `plugin list` 有包但 `--dump-config` 没有：检查 `~/.dsh/profiles/<name>/package.json` 的 `dsh.profile.bundles` 中是否存在该包。
