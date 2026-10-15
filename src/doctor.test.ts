@@ -102,7 +102,7 @@ describe('doctor: search engines', () => {
 
   it('keeps readiness separate from a user-disabled engine', () => {
     const report = runDoctor({
-      config: { engines: { firecrawl: { enabled: false } } },
+      config: { engines: { firecrawl: { enabled: false }, keenable: { enabled: false } } },
       env: BARE_ENV,
     });
     const firecrawl = engine(report, 'search', 'firecrawl');

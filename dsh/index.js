@@ -454,13 +454,21 @@ function renderFetchEvidence(value) {
 // ---------------------------------------------------------------------------
 
 /** The engines the card offers, in the order the docs introduce them. */
-const CARD_ENGINES = ['antigravity-cli', 'tavily', 'exa', 'firecrawl', 'grok-cli', 'local'];
+const CARD_ENGINES = [
+  'antigravity-cli',
+  'tavily',
+  'exa',
+  'firecrawl',
+  'keenable',
+  'grok-cli',
+  'local',
+];
 /** The HTTP engines: the only ones with a key and an endpoint to configure. */
-const KEYED_ENGINES = ['tavily', 'exa', 'firecrawl'];
+const KEYED_ENGINES = ['tavily', 'exa', 'firecrawl', 'keenable'];
 /**
  * Engines whose `model` setting a run actually reads. The others are shown
- * without the field rather than with one nothing is behind: tavily, exa and
- * firecrawl ignore it, and grok-cli follows whatever Grok Build is signed in
+ * without the field rather than with one nothing is behind: the HTTP engines
+ * ignore it, and grok-cli follows whatever Grok Build is signed in
  * with.
  */
 const MODEL_ENGINES = ['antigravity-cli'];
@@ -485,6 +493,7 @@ const ENGINE_ENV_BINDINGS = {
   tavily: { apiKey: 'TAVILY_API_KEY', baseURL: 'TAVILY_BASE_URL' },
   exa: { apiKey: 'EXA_API_KEY', baseURL: 'EXA_BASE_URL' },
   firecrawl: { apiKey: 'FIRECRAWL_API_KEY', baseURL: 'FIRECRAWL_BASE_URL' },
+  keenable: { apiKey: 'KEENABLE_API_KEY', baseURL: 'KEENABLE_BASE_URL' },
 };
 
 /** The canonical engine a stored name means, or '' when it names none. */

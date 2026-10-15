@@ -33,7 +33,7 @@ export interface EngineSettings {
    */
   keylessFetch?: boolean;
   /**
-   * Endpoint base for the HTTP engines (tavily, exa, firecrawl), replacing the
+   * Endpoint base for the HTTP engines (tavily, exa, firecrawl, keenable), replacing the
    * official host: a third-party compatible gateway, a proxy, a self-hosted
    * deployment. The engine appends its documented path (`/search`, `/v2/scrape`)
    * and sends its API key to whatever host this names, which is exactly the
@@ -79,6 +79,7 @@ const ENV_BINDINGS: Record<string, Partial<Record<StringEngineSetting, string>>>
   tavily: { apiKey: 'TAVILY_API_KEY', baseURL: 'TAVILY_BASE_URL' },
   exa: { apiKey: 'EXA_API_KEY', baseURL: 'EXA_BASE_URL' },
   firecrawl: { apiKey: 'FIRECRAWL_API_KEY', baseURL: 'FIRECRAWL_BASE_URL' },
+  keenable: { apiKey: 'KEENABLE_API_KEY', baseURL: 'KEENABLE_BASE_URL' },
 };
 
 const SETTABLE_ENGINE_FIELDS: Array<keyof EngineSettings> = [

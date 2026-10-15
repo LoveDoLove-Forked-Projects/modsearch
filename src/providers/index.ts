@@ -4,6 +4,7 @@ import { exaProvider } from './exa.ts';
 import { firecrawlProvider } from './firecrawl.ts';
 import { grokCliProvider } from './grok.ts';
 import { httpFetchProvider } from './httpFetch.ts';
+import { keenableProvider } from './keenable.ts';
 import { tavilyProvider } from './tavily.ts';
 
 export type RunMode = 'search' | 'fetch';
@@ -85,6 +86,7 @@ const ENGINES: Record<string, SearchEngine> = {
   tavily: tavilyProvider,
   exa: exaProvider,
   firecrawl: firecrawlProvider,
+  keenable: keenableProvider,
   'grok-cli': grokCliProvider,
   grok: grokCliProvider,
   // The built-in direct fetcher, canonically `local`. `http` and `direct` stay
@@ -100,10 +102,12 @@ const ENGINES: Record<string, SearchEngine> = {
  */
 export const ROLE_PREFERENCE: Record<Role, string[]> = {
   // Firecrawl leads: its keyless allowance works on a bare machine with no
-  // signup, which is the product's zero-setup promise. agy synthesizes and
-  // cites but its weekly quota is small, so it backs Firecrawl up rather than
-  // fronting the chain. Tavily and Exa are keyed backups.
-  search: ['firecrawl', 'antigravity-cli', 'tavily', 'exa'],
+  // signup, which is the product's zero-setup promise. Keenable is the second
+  // keyless engine, so a bare machine still has a fallback when Firecrawl's
+  // daily allowance runs out. agy synthesizes and cites but its weekly quota
+  // is small, so it backs the keyless pair up rather than fronting the chain.
+  // Tavily and Exa are keyed backups.
+  search: ['firecrawl', 'keenable', 'antigravity-cli', 'tavily', 'exa'],
   // Firecrawl runs a cloud browser for JS-heavy pages, keyless by default
   // (opt out with firecrawl.keylessFetch false). agy extracts to a focus. The
   // local needs no setup and returns the page as served, so it stays the

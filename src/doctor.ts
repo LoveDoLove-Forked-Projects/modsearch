@@ -213,6 +213,22 @@ function diagnoseEngine(
     };
   }
 
+  if (engine.name === 'keenable') {
+    const { count, source: keySource } = configuredApiKeys(
+      env.KEENABLE_API_KEY,
+      config.engines?.keenable?.apiKey,
+    );
+    return {
+      engine: engine.name,
+      enabled,
+      ready: true,
+      keySource,
+      reason: keySource
+        ? apiKeyPresentReason(count, keySource)
+        : 'keyless: works with no key and no signup (1,000 requests/hour, shared by everyone on this IP). Set a free key for 100,000 requests/month of your own.',
+    };
+  }
+
   if (engine.name === 'firecrawl') {
     const { count, source: keySource } = configuredApiKeys(
       env.FIRECRAWL_API_KEY,

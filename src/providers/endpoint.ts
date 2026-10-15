@@ -1,4 +1,4 @@
-// Endpoint resolution for the HTTP engines (tavily, exa, firecrawl). Its own
+// Endpoint resolution for the HTTP engines (tavily, exa, firecrawl, keenable). Its own
 // module (importing only the dependency-free redact util), so providers can
 // use it at runtime without creating a value-level cycle through the registry
 // in index.ts.

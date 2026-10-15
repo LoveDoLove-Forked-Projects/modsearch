@@ -57,7 +57,7 @@ program
   )
   .option(
     '-e, --engine <name>',
-    'Engine for this run, overriding config (antigravity-cli, tavily, exa, firecrawl, grok-cli, local)',
+    'Engine for this run, overriding config (antigravity-cli, tavily, exa, firecrawl, keenable, grok-cli, local)',
   )
   .option('-m, --model <name>', 'Engine model, where the engine has one')
   .option('--prompt <text>', 'Extra constraints for this run')
@@ -178,7 +178,7 @@ config
         [
           `Created ${CONFIG_PATH}`,
           'Everything is optional. Things you can set:',
-          '  modsearch config set engine <antigravity-cli|tavily|exa|firecrawl>   which engine searches',
+          '  modsearch config set engine <antigravity-cli|tavily|exa|firecrawl|keenable>   which engine searches',
           '  modsearch config set <engine>.<apiKey|bin|model|baseURL|keylessFetch> <value>   engine settings',
           '  modsearch config set cooldown <on|off>   quota cooldown failover (default on)',
           '  modsearch config set allowPrivateNetwork <true|false>   reach reserved/private ranges (default false)',
