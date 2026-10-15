@@ -1,5 +1,11 @@
 # Changelog
 
+## 5.10.7 - 2026-10-16
+
+- New search engine: Keenable (#36). It searches with no key and no signup, on a pool of 1,000 requests an hour shared by everyone on the same IP. A free key (`modsearch config set keenable.apiKey <key>` or `KEENABLE_API_KEY`) gives you 100,000 requests a month of your own with no hourly cap. It sits second in the search chain, right after Firecrawl, so a machine with nothing set up still has a fallback when Firecrawl's allowance runs out. It searches only: page fetch stays with Firecrawl, agy, and local. The dsh settings card lists it next to Firecrawl as a keyless engine.
+- On Windows, a search that had already printed its result no longer crashes on the way out with `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)` and exit code 3221226505 (#38). 5.10.6 ended the process the moment the result was written, which on Windows could tear down a network connection that was still closing, so callers that check the exit code threw away a good result. The CLI now sets its exit code and lets Node finish on its own. A 2 second backstop still ends a run that work abandoned at its deadline would otherwise keep alive.
+- A dsh plugin installed from the GitHub repository now says what went wrong (#41). The repository holds source only, so that install has no built CLI, and every search used to fail with a bare `Cannot find module .../dist/main.js`. The plugin now says the build is missing and to add it again by package name, `@liustack/modsearch`. The README and dsh docs say the same up front.
+
 ## 5.10.6 - 2026-10-04
 
 - dsh's `web_search` no longer dies with `tool call timed out after 60000ms` when the first engine is slow (#35). `--timeout` limits each engine, and every fallback engine used to start with a fresh budget, so a slow first engine could use up the host's whole 60 seconds before the fallback answered. The new `--deadline <ms>` limits the whole run: each engine gets the smaller of `--timeout` and the time left, and an engine whose turn comes after the deadline is skipped and listed in `attempts`. The dsh plugin now passes 40 seconds per engine and a 55 second deadline for `web_search` (configurable as `providerTimeoutMs` and `providerDeadlineMs`), and 120 and 180 seconds for `x_search` and `read_page`.
