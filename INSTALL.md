@@ -108,7 +108,8 @@ modsearch does three jobs, and none of them blocks on setup:
 
 - **Web search and page fetch (`-q`, `-u`) work as installed.** The default
   engine is Firecrawl's keyless tier: 1,000 free credits/month, no account, no
-  key. A dependency-free local fetcher backs page fetch as the floor. If the
+  key. Keenable's keyless search (1,000 requests/hour per IP, no signup) backs
+  it up. A dependency-free local fetcher backs page fetch as the floor. If the
   user wants nothing more, skip to Step 4.
 - **X (Twitter) search needs Grok Build** (SuperGrok or X Premium), installed and
   signed in. Set it up only if the user wants X. It needs no key beyond that login.
@@ -158,9 +159,10 @@ steps, each safe to re-run.
    agy   # opens the browser for the user's one-time sign-in, then they exit
    ```
 
-If a browser sign-in is not possible, the keyless Firecrawl default already keeps
-the CLI fully usable. Add a key only when the user wants a personal quota on top.
-All three keyed services have a free tier and need no card. Run settings through
+If a browser sign-in is not possible, the keyless Firecrawl and Keenable defaults
+already keep the CLI fully usable. Add a key only when the user wants a personal
+quota on top. Tavily, Exa, and Firecrawl have a free tier and need no card. A free
+Keenable key (from https://app.keenable.ai) gives 100,000 requests a month. Run settings through
 the launcher (replace the path with your TARGET from Step 1), so they work even on
 a host without npx:
 
@@ -173,6 +175,7 @@ next engine instead.
 bash ~/.claude/skills/modsearch/scripts/run.sh config set tavily.apiKey <key>       # 1,000 credits/month
 bash ~/.claude/skills/modsearch/scripts/run.sh config set exa.apiKey <key>          # $10/month credit, ~1,400 searches
 bash ~/.claude/skills/modsearch/scripts/run.sh config set firecrawl.apiKey <key>    # personal 1,000 credits/month on top of the keyless quota
+bash ~/.claude/skills/modsearch/scripts/run.sh config set keenable.apiKey <key>     # 100,000 requests/month, no hourly cap
 ```
 
 **If it fails:**
@@ -184,8 +187,8 @@ bash ~/.claude/skills/modsearch/scripts/run.sh config set firecrawl.apiKey <key>
 
 > **Windows:** the `curl | bash` installer is for macOS and Linux. On Windows,
 > agy and grok are usable only if the tool ships a native Windows build on PATH
-> (see "Platform support" in the README). The HTTP engines (Tavily, Exa, Firecrawl)
-> work the same on Windows.
+> (see "Platform support" in the README). The HTTP engines (Tavily, Exa, Firecrawl,
+> Keenable) work the same on Windows.
 
 ---
 
@@ -212,6 +215,7 @@ Node
 search (search the web)
   resolved: firecrawl
   - firecrawl         READY    keyless: works with no key and no signup ...
+  - keenable          READY    keyless: works with no key and no signup (1,000 requests/hour, ...)
 
 fetch (fetch a page)
   resolved: firecrawl
@@ -227,7 +231,7 @@ How to read it:
 - **`Node status: OK`** means the runtime meets the floor (22.13+). If it says
   `TOO OLD`, upgrade Node and stop here, because nothing else will work.
 - **`search resolved: <engine>`** means a web engine is ready. Keyless Firecrawl
-  makes this true on a bare install; agy or a configured key resolves ahead of
+  and Keenable make this true on a bare install. agy or a configured key resolves ahead of
   it when present. If it reads `(none available)`, the installation is
   inconsistent: reinstall this exact release before adding credentials. Each
   not-ready engine prints a `fix:` line when setup can help.
@@ -254,7 +258,7 @@ who answered and an `items` list with `url`s. That is a working install.
   as broken.
 - `Every engine for the web source failed` -> the engines themselves errored at
   runtime (no network, a timeout, or spent quotas), not a setup gap: keyless
-  Firecrawl means a bare install always has a search engine. Read the per-engine
+  Firecrawl and Keenable mean a bare install always has a search engine. Read the per-engine
   attempt lines for the actual cause.
 - A timeout -> retry once with `--timeout 300000`. agy runs take 10-30 seconds.
 - Any other message -> it is catalogued with its cause and fix in

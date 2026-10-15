@@ -39,6 +39,7 @@ src/
     ├── tavily.ts       # Tavily API: search
     ├── exa.ts          # Exa API: search
     ├── firecrawl.ts    # Firecrawl API: search + fetch
+    ├── keenable.ts     # Keenable API: search, keyless by default
     ├── grok.ts         # Grok Build: X
     └── httpFetch.ts    # direct HTTP fetch, no dependencies
 
