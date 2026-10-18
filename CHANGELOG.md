@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.10.10 - 2026-10-19
+
+- `web_fetch` in DeepSeek Harness no longer fails with `multiple usable web providers are registered (deepseek-fetch-api, http); configure one explicitly` (#43). To send `web_search` to modsearch, the plugin rewrites dsh's web settings, and that rewrite replaces the whole block, so it also dropped dsh's own `fetchProvider: http`. That was harmless while `http` was the only page fetcher. Newer dsh builds, the desktop app 44.7.0 among them, add a second one, `deepseek-fetch-api`, so dsh could no longer choose. The plugin now keeps `fetchProvider: http`. If you added a `- id: web` override to your profile patch as a workaround, you can delete it now, or leave it in place. Either way works. The dsh guide's example for switching search back now keeps that line too.
+
 ## 5.10.9 - 2026-10-18
 
 - Correction to 5.10.8 for the DeepSeek Harness desktop app (#42). The dsh CLI refuses to change the desktop app's `desktop` profile (`profile "desktop" is managed exclusively by the Electron application`), so the command INSTALL.md gave there could not work. INSTALL.md now has the AI ask you to open **Plugins**, click **Add plugin**, and enter `@liustack/modsearch`, then confirm the install from the profile's `package.json`. The browser UI and other profiles are unchanged: the AI still installs those itself. The README and dsh guide say the same.
