@@ -53,7 +53,7 @@ npx -y @deepseek-ai/dsh plugin --profile web list --depth 0
 
 bundle 贡献两条 patch：
 
-1. 把 dsh web 接缝的 `searchProvider` 设为 `modsearch`。
+1. 把 dsh web 接缝的 `searchProvider` 设为 `modsearch`，并保留自带的 `fetchProvider: http`（这一行会整体替换宿主的 web 配置）。
 2. 把包根入口挂载为 `modsearch` 插件。
 
 插件随后提供：
@@ -147,6 +147,7 @@ Tavily、Exa、Firecrawl、Keenable 的官方接口地址内置在 provider 代�
 - id: web
   config:
     searchProvider: deepseek-official
+    fetchProvider: http
 
 - id: modsearch
   config:

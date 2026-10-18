@@ -47,6 +47,23 @@ describe('dsh plugin bundle', () => {
     expect(patch).toContain("name: '@liustack/modsearch'");
     expect(patch).toContain('searchProvider: modsearch');
   });
+
+  it('keeps every key of the base web row when repointing search (#43)', () => {
+    // A patch row replaces the target row's whole config. dsh-base ships the
+    // web row as `searchProvider: deepseek-official` + `fetchProvider: http`,
+    // so dropping fetchProvider leaves two usable fetch backends once the host
+    // also registers deepseek-fetch-api, and web_fetch fails as ambiguous.
+    const patch = fs.readFileSync(new URL('../cordis.patch.yml', import.meta.url), 'utf-8');
+    const webRow = /^- id: web\n {2}config:\n((?: {4}\S.*\n)+)/m.exec(patch);
+    expect(webRow).not.toBeNull();
+    const config = Object.fromEntries(
+      webRow![1]
+        .trim()
+        .split('\n')
+        .map((line) => line.trim().split(/:\s*/)),
+    );
+    expect(config).toEqual({ searchProvider: 'modsearch', fetchProvider: 'http' });
+  });
 });
 
 interface RegisteredTool {

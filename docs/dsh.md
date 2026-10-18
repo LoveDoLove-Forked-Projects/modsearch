@@ -53,7 +53,7 @@ The desktop app's `desktop` profile is installed only from its own window: the d
 
 The bundle contributes two patch operations:
 
-1. It sets the dsh web seam's `searchProvider` to `modsearch`.
+1. It sets the dsh web seam's `searchProvider` to `modsearch` and keeps the shipped `fetchProvider: http`, since the row replaces the host's whole web config.
 2. It mounts the package root as the `modsearch` plugin.
 
 The plugin then exposes:
@@ -147,6 +147,7 @@ Disabling only `x_search` or `read_page` is safe. If `searchProvider` is disable
 - id: web
   config:
     searchProvider: deepseek-official
+    fetchProvider: http
 
 - id: modsearch
   config:
