@@ -12,6 +12,8 @@ describe('launcher version stamping', () => {
     const stampedVersions = readStampedVersions();
     expect(stampedVersions.map(({ name }) => name)).toEqual(
       expect.arrayContaining([
+        'INSTALL.md dsh install',
+        'INSTALL.md dsh config',
         'README.md dsh install',
         'README.zh-CN.md dsh install',
         'harness-setup.md dsh install',

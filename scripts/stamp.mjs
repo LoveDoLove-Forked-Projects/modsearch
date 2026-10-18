@@ -78,13 +78,14 @@ export function stampTargets(base, pkgName) {
   ];
 }
 
-/** The README and harness guide commands that install a named dsh version. */
+/** The INSTALL, README, and harness guide commands that pin a named dsh version. */
 export function dshInstallTargets(root, pkgName) {
-  const escaped = pkgName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escapeRe = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const escaped = escapeRe(pkgName);
   const target = (name, file, profile) => ({
     name,
     file: join(root, file),
-    pattern: new RegExp(`--profile ${profile} add ${escaped}@(\\d+\\.\\d+\\.\\d+)`),
+    pattern: new RegExp(`--profile ${escapeRe(profile)} add ${escaped}@(\\d+\\.\\d+\\.\\d+)`),
     format: (version) => `--profile ${profile} add ${pkgName}@${version}`,
   });
   const doctorTarget = (name, file) => ({
@@ -93,7 +94,15 @@ export function dshInstallTargets(root, pkgName) {
     pattern: new RegExp(`npx -y ${escaped}@(\\d+\\.\\d+\\.\\d+) doctor`),
     format: (version) => `npx -y ${pkgName}@${version} doctor`,
   });
+  const installConfigTarget = {
+    name: 'INSTALL.md dsh config',
+    file: join(root, 'INSTALL.md'),
+    pattern: new RegExp(`npx -y ${escaped}@(\\d+\\.\\d+\\.\\d+)\` in place of the launcher`),
+    format: (version) => `npx -y ${pkgName}@${version}\` in place of the launcher`,
+  };
   return [
+    target('INSTALL.md dsh install', 'INSTALL.md', '"$PROFILE"'),
+    installConfigTarget,
     target('README.md dsh install', 'README.md', 'web'),
     target('README.zh-CN.md dsh install', 'README.zh-CN.md', 'web'),
     target('harness-setup.md dsh install', 'docs/harness-setup.md', 'web'),

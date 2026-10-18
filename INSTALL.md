@@ -5,12 +5,63 @@ document is the procedure. Follow it in order. Every step is safe to run again,
 and every step names what to do when it fails. Commands are POSIX shell
 (macOS or Linux). A Windows note follows each block that needs one.
 
+**Running in DeepSeek Harness (dsh), or installing for it?** Stop here and follow
+[Step 0](#step-0-deepseek-harness-dsh-install-the-plugin-instead) instead. dsh
+takes modsearch as a plugin, not a skill.
+
 The whole install is four steps:
 
 1. Find the skill directory for your harness.
 2. Put the `skills/modsearch` folder into it.
 3. Optionally add engines (search and fetch already work keyless out of the box).
 4. Verify with `doctor` and one real search.
+
+---
+
+## Step 0: DeepSeek Harness (dsh): install the plugin instead
+
+dsh already has a native `web_search` tool, wired to its own default search
+provider. A skill cannot replace that tool, so a modsearch skill in dsh mostly
+goes unused. The plugin does replace it: it points `web_search` at the
+modsearch engine chain and adds `x_search` and `read_page`. In dsh, install the
+plugin and skip Steps 1 to 4. Do not also install the skill.
+
+You are in dsh if `echo $DSH_SHELL` prints `1`. dsh sets it in every shell call,
+along with `DSH_PROFILE`, the profile you are running in. If you are another
+agent installing for dsh, `DSH_PROFILE` is empty: run `ls ~/.dsh/profiles` and
+ask the user which profile to use. The desktop app runs `desktop`. The browser
+UI started with `dsh --profile web` runs `web`.
+
+```bash
+PROFILE="${DSH_PROFILE:-web}"   # or the profile the user named
+npx -y @deepseek-ai/dsh plugin --profile "$PROFILE" add @liustack/modsearch@5.10.7
+```
+
+Keep the exact version. With `@latest`, pnpm's release-age filter can resolve
+an older package that has no dsh bundle.
+
+Then confirm the profile picked it up. Both lines must appear:
+
+```bash
+npx -y @deepseek-ai/dsh --profile "$PROFILE" --dump-config | grep -E 'searchProvider: modsearch|@liustack/modsearch'
+```
+
+Tell the user to quit and reopen dsh, then start a new conversation. The
+running session keeps its old tools until then. Search works keyless out of
+the box. To add engines or keys later, the user opens **Plugins** in the dsh
+sidebar and picks `@liustack/modsearch`, or you run `config set` as in Step 3
+with `npx -y @liustack/modsearch@5.10.7` in place of the launcher.
+
+**If it fails:**
+- `declares no dsh.bundle` -> an older package was resolved. Re-run the `add`
+  line with the exact version above.
+- `--dump-config` shows neither line -> the plugin went into a different
+  profile. Check `PROFILE` and re-run the `add` line.
+- Anything else -> see the [dsh plugin guide](docs/dsh.md).
+
+> **Windows:** in PowerShell, set the profile with
+> `$DshProfile = if ($env:DSH_PROFILE) { $env:DSH_PROFILE } else { 'web' }` and pass
+> `--profile $DshProfile`. Use `Select-String` in place of `grep`.
 
 ---
 
