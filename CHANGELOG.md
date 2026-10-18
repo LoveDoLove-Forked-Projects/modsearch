@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.10.8 - 2026-10-18
+
+- Asking an AI to install modsearch inside DeepSeek Harness (dsh) now installs the dsh plugin (#42). INSTALL.md used to install the skill everywhere, but dsh already has its own `web_search` tool, so the skill was never called and searches kept going to dsh's default provider. INSTALL.md now starts with a dsh step: when `DSH_SHELL=1` is set, it installs the plugin into the running profile (`DSH_PROFILE`, so the desktop app's `desktop` profile is covered too), checks it with `--dump-config`, and skips the skill. The README says the same next to the install sentence, and the skill tells a model inside dsh to point the user to the plugin.
+
 ## 5.10.7 - 2026-10-16
 
 - New search engine: Keenable (#36). It searches with no key and no signup, on a pool of 1,000 requests an hour shared by everyone on the same IP. A free key (`modsearch config set keenable.apiKey <key>` or `KEENABLE_API_KEY`) gives you 100,000 requests a month of your own with no hourly cap. It sits second in the search chain, right after Firecrawl, so a machine with nothing set up still has a fallback when Firecrawl's allowance runs out. It searches only: page fetch stays with Firecrawl, agy, and local. The dsh settings card lists it next to Firecrawl as a keyless engine.
