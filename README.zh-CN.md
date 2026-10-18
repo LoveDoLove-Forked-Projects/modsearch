@@ -85,6 +85,8 @@ key 也可以走环境变量（`TAVILY_API_KEY`、`EXA_API_KEY`、`FIRECRAWL_API
 
 > 按 https://github.com/liustack/modsearch 的 INSTALL.md 安装并配置 modsearch skill，完成后运行体检并把结果告诉我。
 
+DeepSeek Harness (dsh) 里发同一句话即可。INSTALL.md 会认出 dsh，改装原生插件而不是 skill，让 dsh 自带的 `web_search` 直接跑在 modsearch 上。想自己动手？桌面版在「添加插件」里填 `@liustack/modsearch`，浏览器版用[特性](#特性)里那条一键命令。
+
 也可以直接通过 [skills.sh](https://skills.sh/) 安装同一个 skill：
 
 ```bash

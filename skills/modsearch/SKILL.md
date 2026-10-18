@@ -19,6 +19,9 @@ Do not use this skill for:
 
 - Analyzing images (that is `modlens`)
 - Questions your own knowledge answers reliably and time does not affect
+- Searching inside DeepSeek Harness (dsh, `DSH_SHELL=1`): there modsearch runs as
+  a plugin behind the native `web_search`. If dsh still answers from its default
+  provider, the plugin is missing: point the user to Step 0 of INSTALL.md
 
 ## Prerequisites
 
