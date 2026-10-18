@@ -34,7 +34,7 @@ UI started with `dsh --profile web` runs `web`.
 
 ```bash
 PROFILE="${DSH_PROFILE:-web}"   # or the profile the user named
-npx -y @deepseek-ai/dsh plugin --profile "$PROFILE" add @liustack/modsearch@5.10.7
+npx -y @deepseek-ai/dsh plugin --profile "$PROFILE" add @liustack/modsearch@5.10.8
 ```
 
 Keep the exact version. With `@latest`, pnpm's release-age filter can resolve
@@ -50,7 +50,7 @@ Tell the user to quit and reopen dsh, then start a new conversation. The
 running session keeps its old tools until then. Search works keyless out of
 the box. To add engines or keys later, the user opens **Plugins** in the dsh
 sidebar and picks `@liustack/modsearch`, or you run `config set` as in Step 3
-with `npx -y @liustack/modsearch@5.10.7` in place of the launcher.
+with `npx -y @liustack/modsearch@5.10.8` in place of the launcher.
 
 **If it fails:**
 - `declares no dsh.bundle` -> an older package was resolved. Re-run the `add`
