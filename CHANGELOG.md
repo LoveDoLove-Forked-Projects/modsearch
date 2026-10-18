@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.10.9 - 2026-10-18
+
+- Correction to 5.10.8 for the DeepSeek Harness desktop app (#42). The dsh CLI refuses to change the desktop app's `desktop` profile (`profile "desktop" is managed exclusively by the Electron application`), so the command INSTALL.md gave there could not work. INSTALL.md now has the AI ask you to open **Plugins**, click **Add plugin**, and enter `@liustack/modsearch`, then confirm the install from the profile's `package.json`. The browser UI and other profiles are unchanged: the AI still installs those itself. The README and dsh guide say the same.
+
 ## 5.10.8 - 2026-10-18
 
 - Asking an AI to install modsearch inside DeepSeek Harness (dsh) now installs the dsh plugin (#42). INSTALL.md used to install the skill everywhere, but dsh already has its own `web_search` tool, so the skill was never called and searches kept going to dsh's default provider. INSTALL.md now starts with a dsh step: when `DSH_SHELL=1` is set, it installs the plugin into the running profile (`DSH_PROFILE`, so the desktop app's `desktop` profile is covered too), checks it with `--dump-config`, and skips the skill. The README says the same next to the install sentence, and the skill tells a model inside dsh to point the user to the plugin.
