@@ -47,7 +47,7 @@ npx -y @deepseek-ai/dsh plugin --profile web list --depth 0
 
 这里故意写精确版本。pnpm 11 可能通过 `minimumReleaseAge` 扣住刚发布的版本，让 `@latest` 解析成旧包。发布流程会让本命令中的版本与 `package.json` 保持同步。
 
-在桌面版的「添加插件」对话框里，填包名 `@liustack/modsearch`，不要填 GitHub 仓库地址。只有 npm 包带构建好的 CLI。从 GitHub 安装只拿到源码，而 pnpm 会拦下补构建的那一步。
+桌面版的 `desktop` profile 只能在桌面版窗口里装，dsh CLI 会以 `profile "desktop" is managed exclusively by the Electron application` 拒绝它。在「添加插件」对话框里，填包名 `@liustack/modsearch`，不要填 GitHub 仓库地址。只有 npm 包带构建好的 CLI。从 GitHub 安装只拿到源码，而 pnpm 会拦下补构建的那一步。
 
 ## bundle 改了什么
 

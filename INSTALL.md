@@ -32,6 +32,21 @@ agent installing for dsh, `DSH_PROFILE` is empty: run `ls ~/.dsh/profiles` and
 ask the user which profile to use. The desktop app runs `desktop`. The browser
 UI started with `dsh --profile web` runs `web`.
 
+**The desktop app (`DSH_PROFILE` is `desktop`) is installed by the user, not by
+you.** The dsh CLI refuses to change that profile (`profile "desktop" is managed
+exclusively by the Electron application`), so do not run the commands below.
+Ask the user to open **Plugins** in the dsh sidebar, click **Add plugin**, enter
+`@liustack/modsearch` (the package name, not the GitHub URL), and install. When
+they say it is done, confirm the profile lists it:
+
+```bash
+grep '"@liustack/modsearch"' ~/.dsh/profiles/desktop/package.json
+```
+
+Then skip to the restart step after the commands.
+
+**Every other profile:** install it yourself.
+
 ```bash
 PROFILE="${DSH_PROFILE:-web}"   # or the profile the user named
 npx -y @deepseek-ai/dsh plugin --profile "$PROFILE" add @liustack/modsearch@5.10.8
@@ -46,8 +61,8 @@ Then confirm the profile picked it up. Both lines must appear:
 npx -y @deepseek-ai/dsh --profile "$PROFILE" --dump-config | grep -E 'searchProvider: modsearch|@liustack/modsearch'
 ```
 
-Tell the user to quit and reopen dsh, then start a new conversation. The
-running session keeps its old tools until then. Search works keyless out of
+For either path, tell the user to quit and reopen dsh, then start a new
+conversation. The running session keeps its old tools until then. Search works keyless out of
 the box. To add engines or keys later, the user opens **Plugins** in the dsh
 sidebar and picks `@liustack/modsearch`, or you run `config set` as in Step 3
 with `npx -y @liustack/modsearch@5.10.8` in place of the launcher.

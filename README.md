@@ -85,7 +85,7 @@ Keys can also come from the environment (`TAVILY_API_KEY`, `EXA_API_KEY`, `FIREC
 
 > Install and configure the modsearch skill following INSTALL.md at https://github.com/liustack/modsearch, then run the health check and tell me the result.
 
-On DeepSeek Harness (dsh), send the same message. INSTALL.md recognizes dsh and installs the native plugin instead of the skill, so dsh's own `web_search` runs on modsearch. Doing it by hand? In the desktop app's Add plugin dialog, enter `@liustack/modsearch`. For the browser UI, use the one-line command under [Features](#features).
+On DeepSeek Harness (dsh), send the same message. INSTALL.md recognizes dsh and switches to the native plugin instead of the skill, so dsh's own `web_search` runs on modsearch. In the browser UI your AI installs it. The desktop app only takes plugins from its own window, so there your AI asks you to open **Plugins**, click **Add plugin**, and enter `@liustack/modsearch`.
 
 Prefer a direct command? Install the same skill through [skills.sh](https://skills.sh/):
 

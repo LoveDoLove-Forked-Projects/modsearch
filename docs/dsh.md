@@ -47,7 +47,7 @@ npx -y @deepseek-ai/dsh plugin --profile web list --depth 0
 
 The exact version is intentional. pnpm 11 can hold back very recent releases through `minimumReleaseAge`, which can make `@latest` resolve to an older package. The release process keeps the version in this command synchronized with `package.json`.
 
-In the desktop app's **Add plugin** dialog, enter the package name `@liustack/modsearch`, not the GitHub repository URL. Only the npm package ships the built CLI. A GitHub install brings source only, and pnpm blocks the build step that would fill in the gap.
+The desktop app's `desktop` profile is installed only from its own window: the dsh CLI rejects it with `profile "desktop" is managed exclusively by the Electron application`. In the **Add plugin** dialog, enter the package name `@liustack/modsearch`, not the GitHub repository URL. Only the npm package ships the built CLI. A GitHub install brings source only, and pnpm blocks the build step that would fill in the gap.
 
 ## What the bundle changes
 
