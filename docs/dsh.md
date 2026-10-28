@@ -62,7 +62,7 @@ The plugin then exposes:
 | :-- | :-- | :-- |
 | Web search | Built-in `web_search` | Runs the ModSearch web engine chain and keeps native citation cards. |
 | X search | Added `x_search` tool | Uses Grok Build when available. A web substitute is labeled degraded. |
-| Focused page read | Added `read_page` tool | Reads one URL, optionally focused by a question. Private-network targets stay blocked. |
+| Focused page read | Added `read_page` tool | Reads one URL, optionally focused by a question. Private-network targets stay blocked. dsh's own `web_fetch` stays on for raw page text and status codes. |
 
 ## Configure search engines
 

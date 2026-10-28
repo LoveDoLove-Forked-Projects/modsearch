@@ -354,6 +354,16 @@ describe('dsh x_search tool', () => {
 });
 
 describe('dsh read_page tool', () => {
+  // dsh exposes its own web_fetch by default (#47). Both tools take a URL, so
+  // the description has to tell the model which one fits which job.
+  it('tells the model when to pick read_page over web_fetch', async () => {
+    const { tools } = await load();
+    const { description } = toolNamed(tools, 'read_page') as unknown as { description: string };
+    expect(description).toMatch(/web_fetch/);
+    expect(description).toMatch(/JavaScript/);
+    expect(description).toMatch(/raw/i);
+  });
+
   it('returns the fetch evidence fields as the canonical value', async () => {
     const { tools } = await load();
     const tool = toolNamed(tools, 'read_page');
