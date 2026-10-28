@@ -29,7 +29,7 @@ Requires Node 22.13+. CI runs the full gate on macOS, Linux, and Windows (Node 2
 ## Tests never go online
 
 Unit tests must not touch the network. The HTTP engines (Tavily, Exa,
-Firecrawl, Keenable) are exercised with a stubbed `fetch`, a page fetch runs against the
+Firecrawl, Keenable, You.com) are exercised with a stubbed `fetch`, a page fetch runs against the
 loopback server from `startLocalPage` in `src/testing/helpers.ts`, and the
 `agy`/`grok` subprocess engines are replaced with fake CLIs that echo canned
 envelopes. A fake CLI is a POSIX shell script, so the suites that spawn one run

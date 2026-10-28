@@ -38,7 +38,7 @@ but answered wrong.
 - `modsearch --version`:
 - Node version (`node --version`):
 - OS (macOS / Linux + version):
-- Which engine you expected (agy / firecrawl / keenable / tavily / exa / grok-cli / local):
+- Which engine you expected (agy / firecrawl / keenable / youcom / tavily / exa / grok-cli / local):
 
 ## Anything else
 

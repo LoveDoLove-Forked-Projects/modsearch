@@ -86,7 +86,7 @@ modsearch config set firecrawl.keylessFetch false
 modsearch config set cooldown off
 ```
 
-不做任何设置就能开跑：搜索和单页抓取默认运行在 Firecrawl 的免注册免费额度上（每月 1,000 免费 credits，无需注册），搜索还能退到 Keenable 的免注册额度（每个 IP 每小时 1,000 次，无需注册）。免注册公网抓取默认开启，它会把请求的 URL 交给 Firecrawl 的云端爬虫，结果中的 warning 会标明这条路径。`firecrawl.keylessFetch false` 可让自动抓取只走本地。私有或保留地址不会发给 Firecrawl，而会落到本地抓取器。
+不做任何设置就能开跑：搜索和单页抓取默认运行在 Firecrawl 的免注册免费额度上（每月 1,000 免费 credits，无需注册），搜索还能退到 Keenable 的免注册额度（每个 IP 每小时 1,000 次，无需注册），再退到 You.com 的免注册搜索（每个 IP 每天 100 次，无需注册）。免注册公网抓取默认开启，它会把请求的 URL 交给 Firecrawl 的云端爬虫，结果中的 warning 会标明这条路径。`firecrawl.keylessFetch false` 可让自动抓取只走本地。私有或保留地址不会发给 Firecrawl，而会落到本地抓取器。
 
 完整说明见[引擎配置手册](../skills/modsearch/references/configure.zh-CN.md)和[安全说明](security.zh-CN.md)。
 
@@ -96,8 +96,8 @@ dsh 网页端没有终端，所以插件自带一张设置卡片。dsh 0.1.6-alp
 
 卡片管三件事：
 
-- 首选引擎：自动，或 `antigravity-cli`、`tavily`、`exa`、`firecrawl`、`keenable`、`grok-cli` 之一。`firecrawl` 和 `keenable` 两项标注「免注册免费」。`local` 只抓单页不搜索，所以不在这个列表里，除非配置文件当前就把它设成了 `engine`，那时它照常显示，免得界面与文件不一致。
-- 当前所选引擎自己的设置：HTTP 引擎（`tavily`、`exa`、`firecrawl`、`keenable`）显示 API 密钥与接口地址，`antigravity-cli` 显示模型。走自家命令行工具登录的引擎和内置抓取器只显示一行说明，因为它们两样都不需要。选中未配置密钥的 `firecrawl` 或 `keenable` 时会多一行说明，讲清它默认跑在免注册的免费额度上。
+- 首选引擎：自动，或 `antigravity-cli`、`tavily`、`exa`、`firecrawl`、`keenable`、`youcom`、`grok-cli` 之一。`firecrawl`、`keenable` 和 `youcom` 三项标注「免注册免费」。`local` 只抓单页不搜索，所以不在这个列表里，除非配置文件当前就把它设成了 `engine`，那时它照常显示，免得界面与文件不一致。
+- 当前所选引擎自己的设置：HTTP 引擎（`tavily`、`exa`、`firecrawl`、`keenable`）显示 API 密钥与接口地址，`antigravity-cli` 显示模型。走自家命令行工具登录的引擎和内置抓取器只显示一行说明，因为它们两样都不需要。选中未配置密钥的 `firecrawl` 或 `keenable` 时会多一行说明，讲清它默认跑在免注册的免费额度上。选中 `youcom` 时不显示密钥框，改显示一行说明，因为它只有免注册这一种用法。
 - 自动引擎链：只列出 `modsearch doctor` 判定本机已就绪的搜索引擎，每个一个复选框，勾选表示允许自动路由使用它。本机跑不了的引擎不出现在这里，它们不是需要用户做的决定。`local` 是单页抓取，不参与搜索，所以也不在这排里。`grok-cli` 只服务 X 搜索，旁边标注「仅 X 搜索」。读不到 doctor 结果时会列出全部搜索引擎并说明状态未知。保存成功后卡片会重新问一次 doctor，刚配好密钥的引擎马上就能长出复选框。
 
 每个引擎默认都勾选。取消勾选只写入 `enabled: false`，重新勾选会删除这项覆盖，不保存多余的 `true`。取消当前首选引擎时，首选项会回到自动。卡片只改自己列出来的引擎：没有复选框的引擎（本机跑不了的，以及 `local`）的 `enabled` 一律原样带过，改它们只能用 `modsearch config set <engine>.enabled`。本机一个就绪引擎都没有时，这排复选框换成一行提示，说明本机暂无就绪的引擎。
