@@ -461,6 +461,7 @@ const CARD_ENGINES = [
   'exa',
   'firecrawl',
   'keenable',
+  'youcom',
   'grok-cli',
   'local',
 ];

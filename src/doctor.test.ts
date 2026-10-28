@@ -100,9 +100,21 @@ describe('doctor: search engines', () => {
     expect(engine(report, 'search', 'antigravity-cli')?.fix).toContain('antigravity.google');
   });
 
+  it('reports youcom ready on a bare machine with its keyless allowance', () => {
+    const youcom = engine(runDoctor({ config: {}, env: BARE_ENV }), 'search', 'youcom');
+    expect(youcom?.ready).toBe(true);
+    expect(youcom?.reason).toMatch(/keyless.*100 searches\/day/);
+  });
+
   it('keeps readiness separate from a user-disabled engine', () => {
     const report = runDoctor({
-      config: { engines: { firecrawl: { enabled: false }, keenable: { enabled: false } } },
+      config: {
+        engines: {
+          firecrawl: { enabled: false },
+          keenable: { enabled: false },
+          youcom: { enabled: false },
+        },
+      },
       env: BARE_ENV,
     });
     const firecrawl = engine(report, 'search', 'firecrawl');

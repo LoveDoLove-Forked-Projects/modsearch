@@ -229,6 +229,16 @@ function diagnoseEngine(
     };
   }
 
+  if (engine.name === 'youcom') {
+    return {
+      engine: engine.name,
+      enabled,
+      ready: true,
+      reason:
+        'keyless: works with no key and no signup (100 searches/day, shared by everyone on this IP).',
+    };
+  }
+
   if (engine.name === 'firecrawl') {
     const { count, source: keySource } = configuredApiKeys(
       env.FIRECRAWL_API_KEY,

@@ -115,6 +115,7 @@ const SUMMARY = {
     exa: { baseURL: '', model: '', hasKey: false, keySource: null, enabled: false },
     firecrawl: { baseURL: '', model: '', hasKey: false, keySource: null, enabled: true },
     keenable: { baseURL: '', model: '', hasKey: false, keySource: null, enabled: true },
+    youcom: { baseURL: '', model: '', hasKey: false, keySource: null, enabled: true },
     'grok-cli': { baseURL: '', model: '', hasKey: false, keySource: null, enabled: true },
     local: { baseURL: '', model: '', hasKey: false, keySource: null, enabled: true },
   },
@@ -361,6 +362,7 @@ describe('a save carries only what the save is about', () => {
         exa: false,
         firecrawl: true,
         keenable: true,
+        youcom: true,
         'grok-cli': true,
         local: true,
       },
@@ -681,6 +683,7 @@ describe('the automatic engine chain lists what this machine can actually search
       'exa',
       'firecrawl',
       'keenable',
+      'youcom',
       'grok-cli X search only',
     ]);
     expect(view.texts.some((text) => /status is unavailable/i.test(text))).toBe(true);
@@ -717,6 +720,21 @@ describe('the automatic engine chain lists what this machine can actually search
       readiness: READINESS,
     });
     expect(keyed.texts.some((text) => note.test(text))).toBe(false);
+  });
+
+  it('says youcom needs no key and offers no key field', () => {
+    // You.com runs keyless only, so the card has no key to ask for and must
+    // not promise that a key raises the quota.
+    const view = render({ ...SUMMARY, engine: 'youcom', readiness: READINESS });
+    expect(view.texts.some((text) => /100 searches a day per IP/.test(text))).toBe(true);
+    expect(view.texts.some((text) => /Runs on the keyless free tier/i.test(text))).toBe(false);
+    expect(view.texts.some((text) => /local command-line tool/.test(text))).toBe(false);
+    expect(view.options.find((option) => option.value === 'youcom')?.label).toBe(
+      'youcom (keyless free tier)',
+    );
+    expect(render({ ...SUMMARY, engine: 'youcom' }, 'zh-CN').texts).toContain(
+      '走 You.com 免注册免费额度（每个 IP 每天 100 次），无需密钥和接口地址。',
+    );
   });
 });
 
@@ -852,6 +870,7 @@ describe('the preference list offers only engines a preference can mean', () => 
       'exa',
       'firecrawl',
       'keenable',
+      'youcom',
       'grok-cli',
     ]);
   });
