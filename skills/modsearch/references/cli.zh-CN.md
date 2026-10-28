@@ -42,7 +42,7 @@ modsearch -q "reactions on X" --source x       # 搜 X，关于 X 的查询会�
 | `-s, --source <list>` | 语料：`web`、`x` 或 `web,x` | 由查询判断，否则 `web` |
 | `-e, --engine <name>` | 本次只用这个引擎。失败时直接报错，不换引擎 | 自动 |
 | `-o, --output <path>` | 同时把 JSON 写入文件 | |
-| `-m, --model <name>` | 引擎模型 | `gemini-3.6-flash-low` |
+| `-m, --model <name>` | 引擎模型 | `gemini-3.8-flash-low` |
 | `--prompt <text>` | 本次运行的附加约束，传给引擎 | |
 | `--max-results <n>` | 搜索结果上限 | `8` |
 | `--timeout <ms>` | 单个引擎最多用多久。引擎失败后换下一个，下一个重新计时 | `180000` |

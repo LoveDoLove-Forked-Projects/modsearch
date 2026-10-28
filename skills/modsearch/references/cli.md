@@ -42,7 +42,7 @@ Output is always a `results` array, one entry per corpus:
 | `-s, --source <list>` | Corpora: `web`, `x`, or `web,x` | from the query, else `web` |
 | `-e, --engine <name>` | Use only this engine for this run. On failure the run errors instead of switching engines | automatic |
 | `-o, --output <path>` | Also write JSON to a file | |
-| `-m, --model <name>` | Engine model | `gemini-3.6-flash-low` |
+| `-m, --model <name>` | Engine model | `gemini-3.8-flash-low` |
 | `--prompt <text>` | Extra constraints for this run, passed to the engine | |
 | `--max-results <n>` | Maximum search results | `8` |
 | `--timeout <ms>` | Time one engine may take. A failed engine hands over to the next with a fresh budget | `180000` |

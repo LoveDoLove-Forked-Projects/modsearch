@@ -992,7 +992,7 @@ describeSpawn('routing facts cannot be faked by an engine', () => {
     });
     expect(result.results[0].source).toBe('web');
     expect(result.results[0].engine).toBe('antigravity-cli');
-    expect(result.results[0].model).toBe('gemini-3.6-flash-low');
+    expect(result.results[0].model).toBe('gemini-3.8-flash-low');
     expect(result.results[0].durationSeconds).toBeLessThan(100);
   }, 30_000);
 });

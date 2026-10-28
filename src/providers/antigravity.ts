@@ -4,7 +4,7 @@ import { fetchResultSchemaJson, searchResultSchemaJson } from '../schema.ts';
 import { commandOnPath } from '../system.ts';
 import type { EngineRequest, ProviderInvocation, EngineOutput, SearchEngine } from './index.ts';
 
-export const DEFAULT_MODEL = 'gemini-3.6-flash-low';
+export const DEFAULT_MODEL = 'gemini-3.8-flash-low';
 export const DEFAULT_MAX_RESULTS = 8;
 
 interface AgyPrintEnvelope {

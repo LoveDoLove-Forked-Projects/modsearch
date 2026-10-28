@@ -53,7 +53,7 @@ modsearch config show     # 生效配置：文件与环境变量合并，每个�
   "cooldown": "on",
   "allowPrivateNetwork": false,
   "engines": {
-    "antigravity-cli": { "bin": "agy", "model": "gemini-3.6-flash-low" },
+    "antigravity-cli": { "bin": "agy", "model": "gemini-3.8-flash-low" },
     "tavily":          { "apiKey": "tvly-...", "baseURL": "https://gw.example.com/tavily" },
     "exa":             { "apiKey": "...", "enabled": false },
     "firecrawl":       { "apiKey": "fc-...", "keylessFetch": false },
@@ -76,7 +76,7 @@ JSON 不支持注释，所以每个字段的说明在这里：
 | `engines.<name>.baseURL` | string | `tavily`、`exa`、`firecrawl`、`keenable` | 替换官方主机的接口地址：兼容的第三方网关、代理、自建部署。必须是完整的 http(s) URL。也可用环境变量 `TAVILY_BASE_URL` / `EXA_BASE_URL` / `FIRECRAWL_BASE_URL` / `KEENABLE_BASE_URL`。设为空即取消。详见下方端点一节。 |
 | `engines.firecrawl.keylessFetch` | boolean | `firecrawl` | 允许 Firecrawl 在无 key 时抓取公网页面。默认 `true`（免注册抓取开箱即开）。设为 `false` 可让自动抓取远离 Firecrawl 云端。配置了 key 或显式选择 Firecrawl 引擎时仍会启用。 |
 | `engines.<name>.bin` | string | `antigravity-cli`、`grok-cli` | 该引擎 CLI 的路径。默认在 `PATH` 上找 `agy` 和 `grok`。 |
-| `engines.<name>.model` | string | `antigravity-cli` | 引擎使用的模型。默认 `gemini-3.6-flash-low`。 |
+| `engines.<name>.model` | string | `antigravity-cli` | 引擎使用的模型。默认 `gemini-3.8-flash-low`。 |
 
 `local`（内置抓取器）和 `grok-cli` 不需要凭据，但都接受通用的 `enabled` 开关。老文件把 `allowPrivateNetwork` 存在 `engines.http.allowPrivateNetwork` 下，或存成字符串 `"true"`/`"false"` 的，读取时会自动提升为顶层布尔值。
 

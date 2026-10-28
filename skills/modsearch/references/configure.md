@@ -53,7 +53,7 @@ Full structure. Every field is optional, and so is the file itself:
   "cooldown": "on",
   "allowPrivateNetwork": false,
   "engines": {
-    "antigravity-cli": { "bin": "agy", "model": "gemini-3.6-flash-low" },
+    "antigravity-cli": { "bin": "agy", "model": "gemini-3.8-flash-low" },
     "tavily":          { "apiKey": "tvly-...", "baseURL": "https://gw.example.com/tavily" },
     "exa":             { "apiKey": "...", "enabled": false },
     "firecrawl":       { "apiKey": "fc-...", "keylessFetch": false },
@@ -76,7 +76,7 @@ JSON has no comments, so here is every field:
 | `engines.<name>.baseURL` | string | `tavily`, `exa`, `firecrawl`, `keenable` | Endpoint base replacing the official host: a compatible third-party gateway, a proxy, a self-hosted deployment. Must be a full http(s) URL. Also settable via `TAVILY_BASE_URL` / `EXA_BASE_URL` / `FIRECRAWL_BASE_URL` / `KEENABLE_BASE_URL`. Empty unsets it. See the endpoint section below. |
 | `engines.firecrawl.keylessFetch` | boolean | `firecrawl` | Allow public-page fetch through Firecrawl without a key. Default `true` (keyless fetch is on as installed). Set `false` to keep automatic page fetch off Firecrawl's cloud; a configured key or an explicit Firecrawl engine choice still enables it. |
 | `engines.<name>.bin` | string | `antigravity-cli`, `grok-cli` | Path to the engine's CLI binary. Defaults to `agy` and `grok` found on `PATH`. |
-| `engines.<name>.model` | string | `antigravity-cli` | Model the engine uses. Defaults to `gemini-3.6-flash-low`. |
+| `engines.<name>.model` | string | `antigravity-cli` | Model the engine uses. Defaults to `gemini-3.8-flash-low`. |
 
 `local` (the built-in fetcher) and `grok-cli` take no credentials, but both accept the shared `enabled` switch. An old file that kept `allowPrivateNetwork` under `engines.http.allowPrivateNetwork`, or as the string `"true"`/`"false"`, is read and promoted to the top-level boolean automatically.
 
